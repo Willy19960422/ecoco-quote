@@ -13,6 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   :root {
     --bg: #f7f7f5;
@@ -1470,6 +1471,20 @@
     auth: { persistSession: true, autoRefreshToken: true }
   });
 
+  // ==========================================
+  // EMAILJS CONFIG
+  // ==========================================
+  const EMAILJS_PUBLIC_KEY = 'uXW6_AT9UEZ5ADkrg';
+  const EMAILJS_SERVICE_ID = 'service_gykvuot';
+  const EMAILJS_TPL_INVITE = 'template_7fr8o4a';
+  const EMAILJS_TPL_QUOTE  = 'template_2yggbxh';
+  if(window.emailjs){
+    window.emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+  }
+
+  // Storage bucket
+  const STORAGE_BUCKET = 'quotes';
+
   // Current user context
   let currentUser = null;   // { id, email }
   let currentMember = null; // { id, org_id, email, display_name, role, approved }
@@ -1511,9 +1526,9 @@
       bcc_email: 'BCC（密件副本）',
       mail_subject: '主旨',
       mail_body: '內文',
-      attach_hint: 'PDF 會自動下載；開啟郵件草稿後請將下載的 PDF 拖入信件附件區。',
+      attach_hint: 'PDF 將自動上傳到雲端並產生下載連結，附在郵件內文。',
       info_title: '📌 寄送方式說明',
-      info_desc: '點下「下一步」後，瀏覽器會：<br>1. 自動下載報價單 PDF 到您的電腦<br>2. 開啟系統預設郵件程式並帶入收件人、主旨、內文<br>3. 您只需在郵件草稿中加入剛下載的 PDF 為附件，並按送出即可',
+      info_desc: '點下「下一步」並確認後，系統將自動：<br>1. 產生報價單 PDF 並上傳至雲端<br>2. 透過 Email 系統自動寄出（內文含 PDF 下載連結）<br>3. 全程自動，無需開啟任何郵件程式',
       warn_no_email: '無法寄送',
       warn_no_email_desc: '客戶 Email 為空，請先到客戶資料區填寫 Email 後再試。',
       cancel: '取消', back: '← 返回修改',
@@ -1595,7 +1610,7 @@
       approve: '核准',
       role_admin: '管理員', role_member: '成員',
       invite_member: '新增成員',
-      invite_desc: '輸入新員工 Email 與姓名後按「寄出邀請」，系統會寄一封信給對方，對方點連結設定密碼即可登入，自動加入此組織且無需審核。',
+      invite_desc: '輸入新員工 Email 與姓名後按「寄出邀請」，系統會自動寄一封邀請信給對方，對方點連結註冊即可加入此組織（首次註冊後需管理員核准）。',
       new_member_email: '新成員 Email',
       new_member_name: '姓名',
       send_invite: '寄出邀請',
@@ -1640,9 +1655,9 @@
       bcc_email: 'BCC',
       mail_subject: 'Subject',
       mail_body: 'Message',
-      attach_hint: 'PDF will be auto-downloaded. Drag it into your email draft as an attachment before sending.',
+      attach_hint: 'PDF will be uploaded to cloud and a download link included in the message body.',
       info_title: '📌 How sending works',
-      info_desc: 'After clicking Next, your browser will:<br>1. Auto-download the quotation PDF<br>2. Open your default mail app with recipient/subject/body filled in<br>3. Just attach the downloaded PDF and hit send',
+      info_desc: 'After confirmation, the system will automatically:<br>1. Generate the quotation PDF and upload to cloud<br>2. Send the email via email service (with PDF download link in body)<br>3. Fully automated, no email app required',
       warn_no_email: 'Cannot Send',
       warn_no_email_desc: 'Client Email is empty. Please fill in the client Email field first.',
       cancel: 'Cancel', back: '← Back',
@@ -1724,7 +1739,7 @@
       approve: 'Approve',
       role_admin: 'Admin', role_member: 'Member',
       invite_member: 'Add Member',
-      invite_desc: 'Enter new employee email and name, then click "Send Invite". They will receive an email to set their password and auto-join this organization without further approval.',
+      invite_desc: 'Enter new employee email and name, then click "Send Invite". The system will auto-send an invitation email. After they register via the link, the admin needs to approve them once.',
       new_member_email: 'New Member Email',
       new_member_name: 'Name',
       send_invite: 'Send Invite',
@@ -2106,8 +2121,8 @@
   }
 
   // --- PDF Export via html2canvas (preserves CJK fonts) ---
-  async function exportPDF(){
-    toast(t('generating_pdf'));
+  // Generate PDF blob (shared between download & upload)
+  async function generatePdfBlob(){
     const node = buildPdfNode();
     document.body.appendChild(node);
     try {
@@ -2123,7 +2138,6 @@
       if(imgH <= pageH){
         pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
       } else {
-        // Multi-page: slice
         let remaining = imgH;
         let position = 0;
         while(remaining > 0){
@@ -2132,14 +2146,43 @@
           if(remaining > 0){ pdf.addPage(); position -= pageH; }
         }
       }
-      const filename = ($('quote-no').value || 'quotation') + '.pdf';
-      pdf.save(filename);
-    } catch(err){
-      console.error(err);
-      alert('PDF export failed: ' + err.message);
+      return pdf.output('blob');
     } finally {
       node.remove();
     }
+  }
+
+  async function exportPDF(){
+    toast(t('generating_pdf'));
+    try {
+      const blob = await generatePdfBlob();
+      const filename = ($('quote-no').value || 'quotation') + '.pdf';
+      // Trigger download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch(err){
+      console.error(err);
+      alert('PDF export failed: ' + err.message);
+    }
+  }
+
+  // Upload PDF to Supabase Storage and return public URL
+  async function uploadPdfToStorage(blob, filename){
+    if(!currentMember) throw new Error('not logged in');
+    // Path: org_id/quote_no-timestamp.pdf
+    const safeFilename = filename.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const path = currentMember.org_id + '/' + Date.now() + '-' + safeFilename;
+    const { data, error } = await supa.storage.from(STORAGE_BUCKET).upload(path, blob, {
+      contentType: 'application/pdf',
+      upsert: false
+    });
+    if(error) throw error;
+    const { data: urlData } = supa.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+    return urlData.publicUrl;
   }
 
   function buildPdfNode(){
@@ -2896,55 +2939,120 @@
     const sendBtn = $('modal-send');
     const original = sendBtn.innerHTML;
     sendBtn.disabled = true;
-    sendBtn.innerHTML = '⏳ ' + t('generating_pdf');
+
+    const to = $('mail-to').value.trim();
+    const cc = $('mail-cc').value.trim();
+    const bcc = $('mail-bcc').value.trim();
+    const subject = $('mail-subject').value;
+    const userBody = $('mail-body').value;
+    const filename = ($('quote-no').value || 'quotation') + '.pdf';
+
     try {
-      // 1. Generate and download PDF
-      await exportPDF();
-      // 2. Open mailto with delay so PDF download dialog shows first
-      setTimeout(() => {
-        const to = $('mail-to').value.trim();
-        const cc = $('mail-cc').value.trim();
-        const bcc = $('mail-bcc').value.trim();
-        const subject = $('mail-subject').value;
-        let body = $('mail-body').value;
+      // STEP 1: Generate PDF
+      sendBtn.innerHTML = '⏳ ' + (state.lang === 'en' ? 'Generating PDF...' : '產生 PDF...');
+      const pdfBlob = await generatePdfBlob();
 
-        // mailto: URL has practical length limits (Outlook ~2048, browsers vary)
-        // If too long, truncate body and alert user
-        const buildUrl = (b) => {
-          let url = 'mailto:' + encodeURIComponent(to);
-          const params = [];
-          if(cc) params.push('cc=' + encodeURIComponent(cc));
-          if(bcc) params.push('bcc=' + encodeURIComponent(bcc));
-          params.push('subject=' + encodeURIComponent(subject));
-          params.push('body=' + encodeURIComponent(b));
-          return url + '?' + params.join('&');
-        };
+      // STEP 2: Upload to Supabase Storage
+      sendBtn.innerHTML = '⏳ ' + (state.lang === 'en' ? 'Uploading...' : '上傳中...');
+      let pdfUrl = '';
+      try {
+        pdfUrl = await uploadPdfToStorage(pdfBlob, filename);
+      } catch(upErr){
+        console.error('Storage upload failed:', upErr);
+        // Continue without URL — fallback path will download PDF locally
+      }
 
-        let url = buildUrl(body);
-        if(url.length > 1900){
-          const overflow = url.length - 1900;
-          const cutAt = Math.max(50, body.length - overflow - 50);
-          body = body.slice(0, cutAt) + '\n\n[' + (state.lang==='en' ? 'Content truncated — see attached PDF' : '內文過長已截斷，詳見附件 PDF') + ']';
-          url = buildUrl(body);
-        }
-        window.location.href = url;
+      // STEP 3: Build full message with PDF link
+      const linkBlock = pdfUrl
+        ? '\n\n' + (state.lang === 'en'
+            ? '📎 Download quotation PDF: ' + pdfUrl
+            : '📎 下載報價單 PDF：' + pdfUrl)
+        : '';
+      const fullMessage = userBody + linkBlock;
 
-        // Auto-save the quote on send
-        const s = snapshot();
-        const arr = loadQuotes();
-        const i = arr.findIndex(x => x.id === s.id);
-        if(i >= 0) arr[i] = s; else arr.push(s);
-        saveQuotes(arr);
+      // STEP 4: Send via EmailJS
+      sendBtn.innerHTML = '⏳ ' + (state.lang === 'en' ? 'Sending...' : '寄送中...');
 
-        sendBtn.disabled = false;
-        sendBtn.innerHTML = original;
-        closeEmailModal();
-        toast(t('sent_hint'));
-      }, 400);
-    } catch(err){
+      if(!window.emailjs) throw new Error('EmailJS not loaded');
+
+      const params = {
+        to_email: to,
+        cc: cc || '',
+        bcc: bcc || '',
+        subject: subject,
+        message: fullMessage,
+        from_name: $('from-name').value || (currentOrg ? currentOrg.name : ''),
+        reply_to: $('from-email').value || (currentMember ? currentMember.email : '')
+      };
+
+      await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_QUOTE, params);
+
+      // STEP 5: Save quote to history + push to cloud
+      const s = snapshot();
+      const arr = loadQuotes();
+      const i = arr.findIndex(x => x.id === s.id);
+      if(i >= 0) arr[i] = s; else arr.push(s);
+      saveQuotes(arr);
+      try { await pushQuoteToCloud(s); } catch(e){}
+
       sendBtn.disabled = false;
       sendBtn.innerHTML = original;
-      alert('Error: ' + err.message);
+      closeEmailModal();
+      toast(state.lang === 'en' ? '✓ Quotation sent to ' + to : '✓ 報價單已寄送至 ' + to, 'success');
+
+    } catch(err){
+      console.error('Send error:', err);
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = original;
+      const errMsg = err.text || err.message || 'Unknown error';
+
+      // Fallback: ask user if they want to use mailto instead
+      const useMailto = confirm(
+        (state.lang === 'en'
+          ? 'Auto-send failed: ' + errMsg + '\n\nFall back to opening your email app manually?'
+          : '自動寄信失敗：' + errMsg + '\n\n是否改用本機郵件程式手動寄送？')
+      );
+      if(!useMailto) return;
+
+      // Original mailto fallback path
+      let body = userBody;
+      const buildUrl = (b) => {
+        let url = 'mailto:' + encodeURIComponent(to);
+        const params = [];
+        if(cc) params.push('cc=' + encodeURIComponent(cc));
+        if(bcc) params.push('bcc=' + encodeURIComponent(bcc));
+        params.push('subject=' + encodeURIComponent(subject));
+        params.push('body=' + encodeURIComponent(b));
+        return url + '?' + params.join('&');
+      };
+
+      // Download PDF locally as fallback
+      try {
+        const blob2 = await generatePdfBlob();
+        const url2 = URL.createObjectURL(blob2);
+        const a = document.createElement('a');
+        a.href = url2; a.download = filename; a.click();
+        URL.revokeObjectURL(url2);
+      } catch(e){}
+
+      let url = buildUrl(body);
+      if(url.length > 1900){
+        const overflow = url.length - 1900;
+        const cutAt = Math.max(50, body.length - overflow - 50);
+        body = body.slice(0, cutAt) + '\n\n[' + (state.lang==='en' ? 'Content truncated — see attached PDF' : '內文過長已截斷，詳見附件 PDF') + ']';
+        url = buildUrl(body);
+      }
+      window.location.href = url;
+
+      // Still save the quote
+      const s = snapshot();
+      const arr = loadQuotes();
+      const i = arr.findIndex(x => x.id === s.id);
+      if(i >= 0) arr[i] = s; else arr.push(s);
+      saveQuotes(arr);
+
+      closeEmailModal();
+      toast(t('sent_hint'));
     }
   });
 
@@ -3269,29 +3377,49 @@
     btn.innerHTML = '⏳ ' + t('syncing');
 
     try {
-      // Pre-create a placeholder member row that we'll claim on registration
-      // We use a temporary UUID; the real user_id will replace it after they register
-      // But this requires DB design changes. Simpler path:
-      // Just generate an invite link and show it to the admin to share manually.
       const inviteLink = generateInviteLink();
 
-      // Build clipboard text
-      const subject = (state.lang === 'en'
-        ? 'You are invited to join ' + currentOrg.name + ' on the quotation system'
-        : '邀請您加入 ' + currentOrg.name + ' 的報價單系統');
-      const body = (state.lang === 'en'
-        ? 'Hi ' + name + ',\n\nPlease register via this link to join ' + currentOrg.name + ':\n\n' + inviteLink + '\n\nUse this email when registering: ' + email + '\nTax ID (auto-filled): ' + currentOrg.tax_id
-        : '您好 ' + name + '，\n\n請透過此連結註冊以加入 ' + currentOrg.name + '：\n\n' + inviteLink + '\n\n請使用此 Email 註冊：' + email + '\n統一編號（已預填）：' + currentOrg.tax_id);
+      if(!window.emailjs){
+        throw new Error('EmailJS not loaded');
+      }
 
-      const mailto = 'mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-      window.location.href = mailto;
+      const params = {
+        to_email: email,
+        to_name: name,
+        org_name: currentOrg.name,
+        tax_id: currentOrg.tax_id,
+        invite_link: inviteLink,
+        inviter_name: currentMember.display_name || currentMember.email,
+        from_email: currentMember.email
+      };
+
+      await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_INVITE, params);
 
       resultEl.style.color = 'var(--accent)';
-      resultEl.innerHTML = '✓ ' + (state.lang === 'en' ? 'Email draft opened. After they register, they will appear in "Pending Members" — approve them with one click.' : 'Email 草稿已開啟。對方註冊後會出現在「待審核成員」清單，您一鍵核准即可。');
+      resultEl.innerHTML = '✓ ' + (state.lang === 'en'
+        ? 'Invitation sent to ' + email + '. After they register, approve them in "Pending Members".'
+        : '邀請信已自動寄出至 ' + email + '。對方註冊後請至「待審核成員」核准。');
+      toast(state.lang === 'en' ? '✓ Invitation sent!' : '✓ 邀請信已寄出', 'success');
       $('invite-email').value = '';
       $('invite-name').value = '';
     } catch(e){
-      resultEl.textContent = t('invite_failed') + e.message;
+      console.error('Invite error:', e);
+      // Fallback: open mailto
+      const inviteLink = generateInviteLink();
+      const subject = state.lang === 'en'
+        ? 'You are invited to join ' + currentOrg.name + ' on the quotation system'
+        : '邀請您加入 ' + currentOrg.name + ' 的報價單系統';
+      const body = state.lang === 'en'
+        ? 'Hi ' + name + ',\n\nPlease register via this link:\n' + inviteLink + '\n\nUse this email: ' + email
+        : '您好 ' + name + '，\n\n請透過此連結註冊：\n' + inviteLink + '\n\n請使用此 Email：' + email;
+      const errMsg = e.text || e.message || 'Unknown';
+      resultEl.style.color = 'var(--danger)';
+      resultEl.innerHTML = '⚠ ' + (state.lang === 'en'
+        ? 'Auto-send failed (' + escapeHtml(errMsg) + '). Falling back to manual email.'
+        : '自動寄信失敗（' + escapeHtml(errMsg) + '），改用本機郵件草稿。');
+      setTimeout(() => {
+        window.location.href = 'mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+      }, 1500);
     } finally {
       btn.disabled = false;
       btn.innerHTML = orig;
