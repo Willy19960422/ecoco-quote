@@ -1,0 +1,3177 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0f6e56" />
+<title>報價單系統 | Quotation Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f1efe8;
+    --border: rgba(0,0,0,0.12);
+    --border-strong: rgba(0,0,0,0.22);
+    --text: #1a1a1a;
+    --text-2: #666;
+    --text-3: #999;
+    --accent: #0f6e56;
+    --accent-soft: #e1f5ee;
+    --danger: #a32d2d;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 1080px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  /* Desktop input enhancements */
+  @media (min-width: 961px) {
+    .field input, .field select, .field textarea {
+      padding: 9px 12px;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+    .field input:hover:not(:focus),
+    .field select:hover:not(:focus),
+    .field textarea:hover:not(:focus) {
+      border-color: var(--border-strong);
+    }
+    .items-table input:hover, .items-table textarea:hover {
+      background: #ebe9e1;
+    }
+    /* Subtle hover on cards */
+    .card { transition: border-color 0.2s; }
+
+    /* Better keyboard navigation visibility */
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus,
+    .items-table input:focus,
+    .items-table textarea:focus {
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    /* Wider items columns for desktop */
+    .items-table .col-desc { width: 42%; }
+    .items-table .col-qty  { width: 10%; }
+    .items-table .col-price { width: 18%; }
+    .items-table .col-total { width: 22%; }
+
+    /* Two-column meta-row stays on top */
+    .meta-row { grid-template-columns: 100px 1fr; gap: 24px; align-items: start; }
+    .logo-slot { width: 100px; height: 100px; }
+  }
+
+  /* Header */
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .brand {
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .brand h1 {
+    font-size: 22px; font-weight: 600; margin: 0;
+    letter-spacing: 1px;
+  }
+  .brand small { color: var(--text-2); font-size: 13px; font-weight: 400; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 7px 14px; font-size: 13px;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer;
+    color: var(--text-2); transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tab-btn:hover { border-color: var(--border-strong); color: var(--text); }
+  .tab-btn.active {
+    background: var(--text); color: white; border-color: var(--text);
+  }
+  select, input, textarea, button {
+    font-family: inherit;
+  }
+  .lang-select {
+    height: 34px; padding: 0 10px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); cursor: pointer;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--text-2);
+    margin: 0 0 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* Form */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label {
+    font-size: 12px; color: var(--text-2);
+    font-weight: 500;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+
+  /* Logo */
+  .meta-row {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .logo-slot {
+    width: 88px; height: 88px;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface-2);
+    cursor: pointer; overflow: hidden;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .logo-slot:hover { border-color: var(--accent); }
+  .logo-slot img { width: 100%; height: 100%; object-fit: contain; }
+  .logo-slot .placeholder {
+    color: var(--text-3); font-size: 11px;
+    text-align: center; padding: 8px;
+  }
+  .logo-remove {
+    position: absolute; top: 2px; right: 2px;
+    width: 20px; height: 20px;
+    border: none; border-radius: 50%;
+    background: rgba(0,0,0,0.5); color: white;
+    font-size: 13px; line-height: 1; cursor: pointer;
+    display: none;
+  }
+  .logo-slot.has-image .logo-remove { display: block; }
+
+  /* Items table */
+  .items-wrap { overflow-x: auto; }
+  .items-table {
+    width: 100%; border-collapse: collapse;
+    table-layout: fixed; min-width: 640px;
+  }
+  .items-table th {
+    text-align: left; font-weight: 500;
+    color: var(--text-2); font-size: 11px;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .items-table td { padding: 8px 4px; vertical-align: top; }
+  .items-table input, .items-table textarea {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 13px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .items-table input:hover, .items-table textarea:hover { background: #ebe9e1; }
+  .items-table input:focus, .items-table textarea:focus {
+    outline: none; background: var(--surface);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .items-table textarea { resize: vertical; min-height: 36px; line-height: 1.5; }
+  .col-desc { width: 38%; }
+  .col-qty  { width: 12%; }
+  .col-price { width: 18%; }
+  .col-total { width: 22%; text-align: right; }
+  .col-act { width: 40px; }
+  .line-total {
+    text-align: right; padding-right: 6px;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+  }
+  .row-del {
+    border: none; background: transparent;
+    color: var(--text-3); cursor: pointer;
+    width: 28px; height: 28px; border-radius: var(--radius);
+    font-size: 16px; line-height: 1;
+  }
+  .row-del:hover { background: var(--surface-2); color: var(--danger); }
+  .add-row-btn {
+    margin-top: 10px;
+    padding: 7px 12px; font-size: 13px;
+    border: 1px dashed var(--border-strong);
+    background: transparent;
+    border-radius: var(--radius); cursor: pointer;
+    color: var(--text-2);
+  }
+  .add-row-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Summary */
+  .summary {
+    display: grid; grid-template-columns: 1fr 320px;
+    gap: 20px; align-items: start;
+  }
+  .totals {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .totals-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 6px 0;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .totals-row label {
+    color: var(--text-2); display: flex;
+    align-items: center; gap: 6px;
+  }
+  .totals-row.grand {
+    border-top: 1px solid var(--border-strong);
+    margin-top: 8px; padding-top: 12px;
+    font-size: 17px; font-weight: 600;
+  }
+  .mini-input {
+    width: 64px; height: 28px;
+    padding: 4px 6px; font-size: 12px;
+    text-align: right;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .mini-select {
+    height: 28px; padding: 0 4px; font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  /* Actions */
+  .actions {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 9px 16px; font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer;
+    background: var(--surface); color: var(--text);
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+  .btn:hover { border-color: var(--border-strong); }
+  .btn.primary {
+    background: var(--text); color: white; border-color: var(--text);
+  }
+  .btn.primary:hover { background: #000; }
+  .btn.accent {
+    background: var(--accent); color: white; border-color: var(--accent);
+  }
+
+  /* History */
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-item {
+    display: flex; justify-content: space-between;
+    align-items: center; gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s;
+  }
+  .history-item:hover { border-color: var(--border-strong); background: #fafaf8; }
+  .history-meta { flex: 1; min-width: 0; }
+  .history-meta strong {
+    display: block; font-size: 14px; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .history-meta span {
+    display: block; font-size: 12px; color: var(--text-3);
+    margin-top: 2px;
+  }
+  .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .empty {
+    text-align: center; padding: 40px 20px;
+    color: var(--text-3); font-size: 13px;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: white;
+    padding: 12px 22px; border-radius: var(--radius);
+    font-size: 14px; font-weight: 500;
+    opacity: 0; pointer-events: none;
+    transition: all 0.25s;
+    z-index: 1000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    max-width: 90%;
+    text-align: center;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast.success { background: var(--accent); }
+  .toast.error { background: var(--danger); }
+
+  /* Icons via simple unicode/CSS */
+  .ico { font-style: normal; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999; padding: 20px;
+    animation: fadeIn 0.18s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    width: 100%; max-width: 640px;
+    max-height: 90vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    animation: slideUp 0.22s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
+  .modal-close {
+    border: none; background: transparent;
+    font-size: 22px; cursor: pointer; color: var(--text-2);
+    width: 30px; height: 30px; border-radius: var(--radius);
+    line-height: 1;
+  }
+  .modal-close:hover { background: var(--surface-2); color: var(--text); }
+  .modal-body {
+    padding: 22px 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-footer {
+    padding: 14px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .step-indicator {
+    display: flex; align-items: center;
+    margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .step {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text-3); font-size: 12px; font-weight: 500;
+  }
+  .step.active { color: var(--text); }
+  .step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--surface-2); color: var(--text-3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+  .step.active .step-num { background: var(--accent); color: white; }
+  .step.done .step-num { background: var(--accent); color: white; }
+  .step-line { flex: 1; height: 1px; background: var(--border); margin: 0 12px; }
+  .modal .field input, .modal .field textarea {
+    padding: 9px 11px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); width: 100%;
+  }
+  .modal .field input:focus, .modal .field textarea:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .modal .field label {
+    font-size: 12px; font-weight: 500; color: var(--text-2);
+    display: block; margin-bottom: 5px;
+  }
+  .attach-box {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--accent-soft);
+    border-radius: var(--radius);
+    margin-top: 6px;
+  }
+  .attach-icon { font-size: 18px; }
+  .modal-info {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: #fff8e1;
+    border-left: 3px solid #f5a623;
+    border-radius: var(--radius);
+    font-size: 12px; color: #5c4a00;
+  }
+  .modal-info strong { display: block; margin-bottom: 6px; font-size: 12px; }
+  .modal-info p { margin: 0; line-height: 1.7; }
+  .warn-box {
+    padding: 12px 14px;
+    background: #fdecec;
+    border-left: 3px solid var(--danger);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    font-size: 13px; color: var(--danger);
+  }
+  .warn-box p { margin: 4px 0 0; font-size: 12px; }
+  .confirm-box { text-align: center; padding: 8px 0; }
+  .confirm-icon {
+    font-size: 36px;
+    width: 64px; height: 64px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .confirm-box h3 { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+  .confirm-summary {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .confirm-summary .row {
+    display: flex; padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .confirm-summary .row:last-child { border-bottom: none; }
+  .confirm-summary .row .k {
+    color: var(--text-2); width: 100px; flex-shrink: 0; font-size: 12px;
+  }
+  .confirm-summary .row .v {
+    flex: 1; word-break: break-all; font-weight: 500;
+  }
+  .confirm-summary .row.total .v {
+    color: var(--accent); font-size: 15px; font-weight: 600;
+  }
+  .confirm-warn {
+    padding: 10px 14px;
+    background: #fff3cd;
+    border-radius: var(--radius);
+    font-size: 12px; color: #664d03;
+    text-align: left;
+  }
+  .confirm-warn strong { display: block; margin-bottom: 3px; }
+  .confirm-warn p { margin: 0; line-height: 1.6; }
+  .btn.accent {
+    background: var(--accent); color: white; border-color: var(--accent);
+  }
+  .btn.accent:hover { background: #0a5742; border-color: #0a5742; }
+
+  /* ==========================================
+     AUTH SCREEN
+     ========================================== */
+  .auth-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    z-index: 9000;
+    overflow-y: auto;
+  }
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px 28px;
+    width: 100%; max-width: 400px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  }
+  .auth-brand { text-align: center; margin-bottom: 24px; }
+  .auth-brand h1 { font-size: 28px; margin: 0; letter-spacing: 2px; font-weight: 600; }
+  .auth-brand p { margin: 4px 0 0; color: var(--text-2); font-size: 13px; }
+  .auth-tabs {
+    display: flex; gap: 0; margin-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+  }
+  .auth-tab {
+    flex: 1; padding: 10px 12px;
+    background: none; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 500;
+    color: var(--text-3);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+  }
+  .auth-tab:hover { color: var(--text-2); }
+  .auth-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .auth-panel .field input {
+    width: 100%; padding: 10px 12px; font-size: 15px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface);
+    min-height: 42px;
+  }
+  .auth-panel .field input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .auth-submit {
+    width: 100%; margin-top: 4px;
+    padding: 12px; font-size: 15px; font-weight: 500;
+    justify-content: center;
+    min-height: 46px;
+  }
+  .auth-submit:disabled { opacity: 0.6; cursor: wait; }
+  .auth-error {
+    margin: 10px 0 0; padding: 0;
+    color: var(--danger); font-size: 13px;
+    min-height: 18px; text-align: center;
+  }
+  .auth-success { color: var(--accent); }
+
+  /* User bar in topbar */
+  .user-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .user-bar strong { color: var(--text); font-weight: 500; }
+  .user-bar .org-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 4px;
+  }
+
+  /* Pending member item */
+  .pending-member-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .pending-member-item .pm-info strong { display: block; font-size: 13px; }
+  .pending-member-item .pm-info span { font-size: 11px; color: var(--text-3); }
+
+  /* Sync indicator */
+  .sync-indicator {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--text-3);
+    margin-left: 8px;
+  }
+  .sync-indicator.syncing::before {
+    content: ''; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--accent);
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .sync-indicator.error::before {
+    content: '⚠'; color: var(--danger);
+  }
+
+
+
+  /* Tablet (≤960px) — narrower sidebar, tighter grids */
+  @media (max-width: 960px) {
+    .app { padding: 20px 16px 80px; }
+    .summary { grid-template-columns: 1fr 280px; }
+  }
+
+  /* Tablet portrait (≤820px) */
+  @media (max-width: 820px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .summary { grid-template-columns: 1fr; }
+    .totals { max-width: 100%; }
+  }
+
+  /* Mobile (≤640px) — major restructure */
+  @media (max-width: 640px) {
+    body { font-size: 15px; }
+    .app { padding: 12px 12px 100px; }
+
+    /* Top bar — stack and full width */
+    .topbar { gap: 8px; margin-bottom: 14px; }
+    .brand h1 { font-size: 19px; }
+    .controls { width: 100%; gap: 6px; }
+    .tab-btn { flex: 1; justify-content: center; padding: 9px 6px; font-size: 13px; }
+    .lang-select { flex: 0 0 auto; min-width: 80px; }
+
+    /* Cards — tighter padding, more vertical space */
+    .card { padding: 16px 14px; margin-bottom: 12px; border-radius: var(--radius); }
+    .section-title { font-size: 12px; margin-bottom: 12px; }
+
+    /* All grids collapse to single column */
+    .grid-2, .grid-3, .grid-4, .summary { grid-template-columns: 1fr; gap: 12px; }
+    .meta-row { grid-template-columns: 1fr; gap: 14px; }
+    .logo-slot { width: 100%; max-width: 120px; height: 80px; margin: 0 auto; }
+
+    /* Larger touch targets, better mobile inputs */
+    .field input, .field select, .field textarea {
+      padding: 11px 12px; font-size: 16px; /* 16px prevents iOS zoom on focus */
+      min-height: 44px;
+    }
+    .field label { font-size: 13px; margin-bottom: 4px; }
+
+    /* Items table — convert to card list on mobile */
+    .items-wrap { overflow: visible; }
+    .items-table { display: block; min-width: 0; }
+    .items-table thead { display: none; }
+    .items-table tbody { display: block; }
+    .items-table tr {
+      display: block;
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      padding: 14px 14px 10px;
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .items-table td {
+      display: block;
+      padding: 0;
+      margin-bottom: 8px;
+    }
+    .items-table td:before {
+      content: attr(data-label);
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .items-table td.col-desc { width: 100%; }
+    .items-table td.col-qty,
+    .items-table td.col-price {
+      width: 48%;
+      display: inline-block;
+      vertical-align: top;
+      margin-right: 2%;
+    }
+    .items-table td.col-price { margin-right: 0; }
+    .items-table td.col-total {
+      width: 100%;
+      text-align: right;
+      padding-top: 10px;
+      margin-top: 6px;
+      border-top: 1px dashed var(--border);
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .items-table td.col-total:before {
+      display: inline;
+      margin-right: 8px;
+      font-size: 11px;
+      color: var(--text-2);
+    }
+    .items-table td.col-act {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: auto;
+    }
+    .items-table input,
+    .items-table textarea {
+      padding: 10px 12px; font-size: 16px;
+      background: var(--surface);
+      min-height: 44px;
+    }
+    .items-table textarea { min-height: 60px; }
+    .row-del { width: 32px; height: 32px; font-size: 18px; }
+
+    /* Add row button — full width on mobile */
+    .add-row-btn { width: 100%; padding: 12px; font-size: 14px; min-height: 48px; }
+
+    /* Totals — tighter on mobile */
+    .totals { padding: 14px 16px; }
+    .totals-row { font-size: 14px; padding: 7px 0; }
+    .totals-row.grand { font-size: 18px; }
+    .mini-input { width: 70px; height: 32px; font-size: 14px; }
+    .mini-select { height: 32px; font-size: 13px; }
+
+    /* Action buttons — sticky at bottom on mobile */
+    .actions {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+      gap: 6px;
+      z-index: 50;
+      justify-content: space-between;
+    }
+    .actions .btn {
+      flex: 1; min-width: 0;
+      padding: 11px 4px; font-size: 12px;
+      min-height: 46px;
+      justify-content: center;
+    }
+    .actions .btn.primary { flex: 2; font-size: 13px; }
+    .actions .btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Modal — full screen on mobile */
+    .modal-backdrop { padding: 0; align-items: flex-end; }
+    .modal {
+      max-width: 100%;
+      max-height: 95vh;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      animation: slideUpMobile 0.25s ease;
+    }
+    @keyframes slideUpMobile { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-header { padding: 14px 18px; }
+    .modal-header h2 { font-size: 16px; }
+    .modal-body { padding: 16px 18px; }
+    .modal-footer {
+      padding: 12px 16px;
+      gap: 6px;
+    }
+    .modal-footer .btn {
+      flex: 1; padding: 12px 8px;
+      font-size: 13px; min-height: 46px;
+      justify-content: center;
+    }
+    .modal .field input, .modal .field textarea {
+      padding: 11px 12px; font-size: 16px; min-height: 44px;
+    }
+    .step-indicator { margin-bottom: 16px; padding-bottom: 14px; }
+    .step span:last-child { font-size: 11px; }
+
+    /* History items */
+    .history-item {
+      flex-wrap: wrap; gap: 10px;
+      padding: 12px;
+    }
+    .history-meta { width: 100%; }
+    .history-actions { width: 100%; }
+    .history-actions .btn { flex: 1; justify-content: center; min-height: 40px; }
+
+    /* Toast — push above the sticky action bar on mobile */
+    .toast { bottom: 90px; }
+  }
+
+  /* Very small (≤380px) — iPhone SE etc */
+  @media (max-width: 380px) {
+    .actions .btn { font-size: 11px; padding: 11px 2px; }
+    .actions .btn.primary { font-size: 12px; }
+    .brand h1 { font-size: 17px; }
+    .brand small { font-size: 12px; }
+  }
+
+  /* Better focus states on touch devices */
+  @media (hover: none) {
+    .btn:active { transform: scale(0.98); }
+    .tab-btn:active { transform: scale(0.97); }
+    .row-del:active { background: var(--surface-2); }
+    /* Stronger focus for accessibility */
+    input:focus, select:focus, textarea:focus, button:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+  }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .no-print { display: none !important; }
+    .app { max-width: 100%; padding: 0; }
+    .card { border: none; box-shadow: none; padding: 12px 0; margin: 0; page-break-inside: avoid; }
+    .totals { background: #f3f3f3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN — shown when not logged in -->
+<div id="auth-screen" class="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <h1 data-i18n="brand_title">報價單系統</h1>
+      <p data-i18n="auth_subtitle">線上報價單管理工具</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-auth-tab="login" data-i18n="auth_login">登入</button>
+      <button class="auth-tab" data-auth-tab="register" data-i18n="auth_register">註冊</button>
+    </div>
+
+    <!-- Login -->
+    <div id="auth-login" class="auth-panel">
+      <div class="field" style="margin-bottom:12px">
+        <label data-i18n="email">Email</label>
+        <input type="email" id="login-email" autocomplete="email" inputmode="email" />
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label data-i18n="password">密碼</label>
+        <input type="password" id="login-password" autocomplete="current-password" />
+      </div>
+      <button class="btn primary auth-submit" id="btn-login">
+        <span data-i18n="auth_login">登入</span>
+      </button>
+      <p class="auth-error" id="login-error"></p>
+    </div>
+
+    <!-- Register -->
+    <div id="auth-register" class="auth-panel" style="display:none">
+      <div class="field" style="margin-bottom:10px">
+        <label data-i18n="tax_id">公司統一編號 <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="reg-taxid" inputmode="numeric" pattern="[0-9]*" maxlength="8" />
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label data-i18n="company_name">公司名稱 <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="reg-company" />
+        <small style="font-size:11px; color:var(--text-3); margin-top:3px" data-i18n="reg_company_hint">第一個註冊此統編的人需填寫，後續同統編註冊會自動帶入</small>
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label data-i18n="your_name">您的姓名 <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="reg-name" />
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label data-i18n="email">Email <span style="color:var(--danger)">*</span></label>
+        <input type="email" id="reg-email" autocomplete="email" inputmode="email" />
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label data-i18n="password">密碼 <span style="color:var(--danger)">*</span> <span style="font-size:11px; color:var(--text-3)">(<span data-i18n="pwd_hint">至少 8 碼</span>)</span></label>
+        <input type="password" id="reg-password" autocomplete="new-password" minlength="8" />
+      </div>
+      <button class="btn primary auth-submit" id="btn-register">
+        <span data-i18n="auth_register">註冊</span>
+      </button>
+      <p class="auth-error" id="register-error"></p>
+    </div>
+  </div>
+</div>
+
+<!-- PENDING APPROVAL SCREEN -->
+<div id="pending-screen" class="auth-screen" style="display:none">
+  <div class="auth-card" style="text-align:center">
+    <div style="font-size:48px; margin-bottom:14px">⏳</div>
+    <h2 data-i18n="pending_title">等待管理員審核</h2>
+    <p data-i18n="pending_desc" style="color:var(--text-2); margin:12px 0 20px; line-height:1.7">您的帳號已建立，但需要組織管理員核准後才能使用系統。請聯絡您公司的管理員。</p>
+    <button class="btn" id="btn-logout-pending" data-i18n="logout">登出</button>
+  </div>
+</div>
+
+
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar no-print">
+    <div class="brand">
+      <h1 id="topbar-company-name" data-i18n="brand_title">報價單系統</h1>
+      <small data-i18n="quotation_tool">報價單工具</small>
+      <span class="sync-indicator" id="sync-indicator"></span>
+    </div>
+    <div class="controls">
+      <button class="tab-btn active" data-tab="editor">
+        <span class="ico">✎</span> <span data-i18n="tab_editor">編輯</span>
+      </button>
+      <button class="tab-btn" data-tab="history">
+        <span class="ico">⌛</span> <span data-i18n="tab_history">歷史</span>
+      </button>
+      <button class="tab-btn" data-tab="clients">
+        <span class="ico">👥</span> <span data-i18n="tab_clients">客戶</span>
+      </button>
+      <button class="tab-btn" data-tab="products">
+        <span class="ico">📦</span> <span data-i18n="tab_products">品項</span>
+      </button>
+      <button class="tab-btn" data-tab="org">
+        <span class="ico">🏢</span> <span data-i18n="tab_org">組織</span>
+      </button>
+      <button class="tab-btn" data-tab="members" id="tab-btn-members" style="display:none">
+        <span class="ico">👤</span> <span data-i18n="tab_members">成員</span>
+        <span id="pending-badge" style="display:none; background:var(--danger); color:white; padding:1px 6px; border-radius:10px; font-size:10px; margin-left:4px"></span>
+      </button>
+      <div class="user-bar" id="user-bar">
+        <strong id="user-name"></strong>
+        <span class="org-badge" id="user-role"></span>
+      </div>
+      <button class="tab-btn" id="btn-logout" title="登出">
+        <span class="ico">⏻</span>
+      </button>
+      <select id="lang" class="lang-select">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div id="tab-editor">
+
+    <!-- Meta -->
+    <div class="card">
+      <div class="meta-row">
+        <label class="logo-slot" id="logo-slot">
+          <span class="placeholder" id="logo-placeholder" data-i18n="upload_logo">上傳 Logo</span>
+          <img id="logo-img" style="display:none" alt="logo" />
+          <input type="file" id="logo-input" accept="image/*" style="display:none" />
+          <button type="button" class="logo-remove" id="logo-remove" title="Remove">×</button>
+        </label>
+        <div class="grid-4">
+          <div class="field">
+            <label data-i18n="quote_no">報價單編號</label>
+            <input type="text" id="quote-no" />
+          </div>
+          <div class="field">
+            <label data-i18n="quote_date">日期</label>
+            <input type="date" id="quote-date" />
+          </div>
+          <div class="field">
+            <label data-i18n="valid_until">有效期至</label>
+            <input type="date" id="valid-until" />
+          </div>
+          <div class="field">
+            <label data-i18n="currency">貨幣</label>
+            <select id="currency">
+              <option value="TWD">TWD · NT$</option>
+              <option value="USD">USD · $</option>
+              <option value="EUR">EUR · €</option>
+              <option value="JPY">JPY · ¥</option>
+              <option value="CNY">CNY · ¥</option>
+              <option value="GBP">GBP · £</option>
+              <option value="HKD">HKD · HK$</option>
+              <option value="SGD">SGD · S$</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- From / To -->
+    <div class="card">
+      <div class="grid-2">
+        <!-- FROM -->
+        <div>
+          <p class="section-title"><span class="dot"></span><span data-i18n="from">寄件方</span></p>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="field">
+              <label data-i18n="company_name">公司名稱</label>
+              <input type="text" id="from-name" />
+            </div>
+            <div class="field">
+              <label data-i18n="contact_person">報價人</label>
+              <input type="text" id="from-contact" data-i18n-ph="contact_ph" placeholder="負責此報價的聯絡人" />
+            </div>
+            <div class="field">
+              <label data-i18n="address">地址</label>
+              <input type="text" id="from-address" autocomplete="street-address" />
+            </div>
+            <div class="grid-2" style="gap: 10px;">
+              <div class="field">
+                <label data-i18n="phone">電話</label>
+                <input type="tel" id="from-phone" inputmode="tel" autocomplete="tel" />
+              </div>
+              <div class="field">
+                <label data-i18n="email">Email</label>
+                <input type="email" id="from-email" inputmode="email" autocomplete="email" />
+              </div>
+            </div>
+            <div class="field">
+              <label data-i18n="tax_id">統一編號</label>
+              <input type="text" id="from-tax" inputmode="numeric" pattern="[0-9]*" />
+            </div>
+          </div>
+        </div>
+        <!-- TO -->
+        <div>
+          <p class="section-title"><span class="dot" style="background:#534ab7"></span><span data-i18n="to">客戶</span></p>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="field">
+              <label data-i18n="client_name">客戶名稱</label>
+              <div style="display:flex; gap:6px">
+                <input type="text" id="to-name" autocomplete="organization" style="flex:1" />
+                <button type="button" class="btn" id="pick-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="從客戶簿選取">📚</button>
+                <button type="button" class="btn" id="save-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="儲存此客戶">💾</button>
+              </div>
+            </div>
+            <div class="field">
+              <label data-i18n="contact_person_to">聯絡人</label>
+              <input type="text" id="to-contact" autocomplete="name" />
+            </div>
+            <div class="field">
+              <label data-i18n="address">地址</label>
+              <input type="text" id="to-address" />
+            </div>
+            <div class="grid-2" style="gap: 10px;">
+              <div class="field">
+                <label data-i18n="phone">電話</label>
+                <input type="tel" id="to-phone" inputmode="tel" />
+              </div>
+              <div class="field">
+                <label data-i18n="email">Email</label>
+                <input type="email" id="to-email" inputmode="email" />
+              </div>
+            </div>
+            <div class="field">
+              <label data-i18n="tax_id">統一編號</label>
+              <input type="text" id="to-tax" inputmode="numeric" pattern="[0-9]*" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Items -->
+    <div class="card">
+      <p class="section-title"><span class="dot" style="background:#d85a30"></span><span data-i18n="items">項目</span></p>
+      <div class="items-wrap">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="col-desc" data-i18n="desc">品名 / 描述</th>
+              <th class="col-qty" data-i18n="qty">數量</th>
+              <th class="col-price" data-i18n="unit_price">單價</th>
+              <th class="col-total" data-i18n="amount">小計</th>
+              <th class="col-act"></th>
+            </tr>
+          </thead>
+          <tbody id="items-body"></tbody>
+        </table>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+        <button class="add-row-btn" id="add-row" style="flex:1">+ <span data-i18n="add_item">新增項目</span></button>
+        <button class="add-row-btn" id="pick-product" style="flex:1; border-style:solid; color:var(--accent); border-color:var(--accent)">📦 <span data-i18n="pick_product">從品項庫</span></button>
+      </div>
+    </div>
+
+    <!-- Notes + Totals -->
+    <div class="card">
+      <div class="summary">
+        <div>
+          <p class="section-title"><span class="dot" style="background:#888"></span><span data-i18n="notes">備註 / 條款</span></p>
+          <textarea id="notes" rows="5" data-i18n-ph="notes_ph" placeholder="付款條件、交貨方式、保固、其他備註..." style="width:100%; padding:10px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px; resize:vertical;"></textarea>
+        </div>
+        <div class="totals">
+          <div class="totals-row">
+            <label data-i18n="subtotal">小計</label>
+            <span id="subtotal">0.00</span>
+          </div>
+          <div class="totals-row">
+            <label>
+              <span data-i18n="discount">折扣</span>
+              <select id="disc-type" class="mini-select">
+                <option value="pct">%</option>
+                <option value="amt">金額</option>
+              </select>
+              <input type="number" id="disc-val" class="mini-input" value="0" min="0" step="0.01" />
+            </label>
+            <span id="discount">−0.00</span>
+          </div>
+          <div class="totals-row">
+            <label>
+              <span data-i18n="tax">稅金</span>
+              <input type="number" id="tax-rate" class="mini-input" value="5" min="0" step="0.01" />
+              <span style="font-size:11px;color:var(--text-3)">%</span>
+            </label>
+            <span id="tax">0.00</span>
+          </div>
+          <div class="totals-row grand">
+            <label data-i18n="total">總計</label>
+            <span id="total">0.00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions no-print">
+      <button class="btn" id="btn-new">+ <span data-i18n="new">新報價單</span></button>
+      <button class="btn" id="btn-duplicate">⎘ <span data-i18n="duplicate">複製</span></button>
+      <button class="btn" id="btn-save">💾 <span data-i18n="save">儲存</span></button>
+      <button class="btn" id="btn-print">🖨 <span data-i18n="print">列印</span></button>
+      <button class="btn" id="btn-pdf">📄 <span data-i18n="pdf">匯出 PDF</span></button>
+      <button class="btn primary" id="btn-send">✉ <span data-i18n="send_email">寄送給客戶</span></button>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div id="tab-history" style="display:none">
+    <div class="card">
+      <p class="section-title"><span class="dot"></span><span data-i18n="history_title">歷史報價</span></p>
+      <input type="search" id="history-search" data-i18n-ph="search_ph" placeholder="搜尋客戶名、報價單號..." style="width:100%; padding:9px 12px; margin-bottom:12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px">
+      <div id="history-list" class="history-list"></div>
+    </div>
+
+    <!-- Data backup -->
+    <div class="card">
+      <p class="section-title"><span class="dot" style="background:#888"></span><span data-i18n="data_mgmt">資料備份</span></p>
+      <p style="font-size:12px; color:var(--text-2); margin:0 0 12px"><span data-i18n="data_mgmt_desc">所有資料儲存在瀏覽器本地，建議定期備份。換電腦時匯入備份即可還原。</span></p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="btn" id="btn-export"><span>⬇</span> <span data-i18n="export_data">匯出全部資料</span></button>
+        <button class="btn" id="btn-import"><span>⬆</span> <span data-i18n="import_data">匯入備份</span></button>
+        <input type="file" id="import-file" accept=".json" style="display:none">
+      </div>
+    </div>
+  </div>
+
+  <!-- Clients -->
+  <div id="tab-clients" style="display:none">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px">
+        <p class="section-title" style="margin:0"><span class="dot" style="background:#534ab7"></span><span data-i18n="clients_title">客戶簿</span></p>
+        <button class="btn" id="btn-add-client">+ <span data-i18n="add_client">新增客戶</span></button>
+      </div>
+      <input type="search" id="client-search" data-i18n-ph="search_ph" placeholder="搜尋..." style="width:100%; padding:9px 12px; margin-bottom:12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px">
+      <div id="clients-list" class="history-list"></div>
+    </div>
+  </div>
+
+  <!-- Products -->
+  <div id="tab-products" style="display:none">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px">
+        <p class="section-title" style="margin:0"><span class="dot" style="background:#d85a30"></span><span data-i18n="products_title">常用品項</span></p>
+        <button class="btn" id="btn-add-product">+ <span data-i18n="add_product">新增品項</span></button>
+      </div>
+      <input type="search" id="product-search" data-i18n-ph="search_ph" placeholder="搜尋..." style="width:100%; padding:9px 12px; margin-bottom:12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px">
+      <div id="products-list" class="history-list"></div>
+    </div>
+  </div>
+
+  <!-- Organization Settings -->
+  <div id="tab-org" style="display:none">
+    <div class="card">
+      <p class="section-title"><span class="dot"></span><span data-i18n="org_title">組織資料</span></p>
+      <p style="font-size:12px; color:var(--text-2); margin:0 0 16px" data-i18n="org_desc">這裡的資料會自動帶入每張新報價單的「寄件方」欄位。</p>
+
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div class="grid-2" style="gap:12px">
+          <div class="field">
+            <label data-i18n="tax_id">統一編號</label>
+            <input type="text" id="org-tax-id" disabled style="background:var(--surface-2)" />
+          </div>
+          <div class="field">
+            <label data-i18n="company_name">公司名稱</label>
+            <input type="text" id="org-name" />
+          </div>
+        </div>
+        <div class="field">
+          <label data-i18n="address">地址</label>
+          <input type="text" id="org-address" />
+        </div>
+        <div class="grid-2" style="gap:12px">
+          <div class="field">
+            <label data-i18n="phone">電話</label>
+            <input type="tel" id="org-phone" inputmode="tel" />
+          </div>
+          <div class="field">
+            <label data-i18n="email">Email</label>
+            <input type="email" id="org-email" inputmode="email" />
+          </div>
+        </div>
+        <div style="text-align:right; margin-top:6px">
+          <button class="btn primary" id="btn-save-org">💾 <span data-i18n="save">儲存</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Members (Admin only) -->
+  <div id="tab-members" style="display:none">
+    <div class="card">
+      <p class="section-title"><span class="dot" style="background:var(--danger)"></span><span data-i18n="pending_members">待審核成員</span></p>
+      <div id="pending-members-list"></div>
+    </div>
+    <div class="card">
+      <p class="section-title"><span class="dot"></span><span data-i18n="active_members">組織成員</span></p>
+      <div id="active-members-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Picker Modal (clients / products) -->
+<div class="modal-backdrop" id="picker-modal" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h2 id="picker-title">選取</h2>
+      <button class="modal-close" id="picker-close" aria-label="close">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="search" id="picker-search" placeholder="搜尋..." style="width:100%; padding:9px 12px; margin-bottom:12px; border:1px solid var(--border); border-radius:var(--radius); font-size:14px">
+      <div id="picker-list" class="history-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Client/Product Edit Modal -->
+<div class="modal-backdrop" id="edit-modal" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h2 id="edit-title">編輯</h2>
+      <button class="modal-close" id="edit-close" aria-label="close">×</button>
+    </div>
+    <div class="modal-body" id="edit-body"></div>
+    <div class="modal-footer">
+      <button class="btn" id="edit-cancel" data-i18n="cancel">取消</button>
+      <button class="btn primary" id="edit-save" data-i18n="save">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Review Modal -->
+<div class="modal-backdrop" id="email-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 data-i18n="review_email">審核寄送內容</h2>
+      <button class="modal-close" id="modal-close" aria-label="close">×</button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Step indicator -->
+      <div class="step-indicator">
+        <div class="step active" id="step-1"><span class="step-num">1</span><span data-i18n="step_review">編輯與預覽</span></div>
+        <div class="step-line"></div>
+        <div class="step" id="step-2"><span class="step-num">2</span><span data-i18n="step_confirm">最終確認</span></div>
+      </div>
+
+      <!-- Step 1: Edit & Preview -->
+      <div id="step-1-panel">
+
+        <div class="warn-box" id="email-warn" style="display:none">
+          <strong>⚠ <span data-i18n="warn_no_email">無法寄送</span></strong>
+          <p data-i18n="warn_no_email_desc">客戶 Email 為空，請先到客戶資料區填寫 Email 後再試。</p>
+        </div>
+
+        <div class="field" style="margin-bottom: 14px;">
+          <label data-i18n="to_email">收件人 Email <span style="color:var(--danger)">*</span></label>
+          <input type="email" id="mail-to" />
+          <small style="color:var(--text-3); font-size:11px; margin-top:4px" data-i18n="to_email_hint">預設帶入客戶資料區的 Email，可手動修改</small>
+        </div>
+
+        <div class="grid-2" style="gap:10px; margin-bottom:14px">
+          <div class="field">
+            <label data-i18n="cc_email">CC（副本）</label>
+            <input type="email" id="mail-cc" placeholder="optional" />
+          </div>
+          <div class="field">
+            <label data-i18n="bcc_email">BCC（密件副本）</label>
+            <input type="email" id="mail-bcc" placeholder="optional" />
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom: 14px;">
+          <label data-i18n="mail_subject">主旨</label>
+          <input type="text" id="mail-subject" />
+        </div>
+
+        <div class="field" style="margin-bottom: 14px;">
+          <label data-i18n="mail_body">內文</label>
+          <textarea id="mail-body" rows="11" style="font-family:inherit; line-height:1.7"></textarea>
+        </div>
+
+        <div class="attach-box">
+          <div class="attach-icon">📎</div>
+          <div style="flex:1">
+            <div style="font-size:13px; font-weight:500" id="attach-filename">quotation.pdf</div>
+            <div style="font-size:11px; color:var(--text-3); margin-top:2px" data-i18n="attach_hint">PDF 會自動下載；開啟郵件草稿後請將下載的 PDF 拖入信件附件區。</div>
+          </div>
+        </div>
+
+        <div class="modal-info">
+          <strong data-i18n="info_title">📌 寄送方式說明</strong>
+          <p data-i18n="info_desc">點下「下一步」後，瀏覽器會：<br>1. 自動下載報價單 PDF 到您的電腦<br>2. 開啟系統預設郵件程式並帶入收件人、主旨、內文<br>3. 您只需在郵件草稿中加入剛下載的 PDF 為附件，並按送出即可</p>
+        </div>
+
+      </div>
+
+      <!-- Step 2: Final Confirm -->
+      <div id="step-2-panel" style="display:none">
+        <div class="confirm-box">
+          <div class="confirm-icon">✉</div>
+          <h3 data-i18n="confirm_title">確定寄送此報價單？</h3>
+          <div class="confirm-summary" id="confirm-summary"></div>
+          <div class="confirm-warn">
+            <strong data-i18n="confirm_warn_title">⚠ 寄出後將無法收回</strong>
+            <p data-i18n="confirm_warn_desc">請再次確認收件人、主旨與報價金額正確無誤。</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn" id="modal-cancel" data-i18n="cancel">取消</button>
+      <button class="btn" id="modal-back" style="display:none" data-i18n="back">← 返回修改</button>
+      <button class="btn primary" id="modal-next"><span data-i18n="next_review">下一步：最終確認</span> →</button>
+      <button class="btn accent" id="modal-send" style="display:none">✓ <span data-i18n="confirm_send">確定寄送</span></button>
+    </div>
+  </div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  // ==========================================
+  // SUPABASE CONFIG
+  // ==========================================
+  const SUPABASE_URL = 'https://qsmrvxubqhouonhooczk.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_8SJBpkQdOpYkXpZQIPjzYg_akLKW9t3';
+  const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true }
+  });
+
+  // Current user context
+  let currentUser = null;   // { id, email }
+  let currentMember = null; // { id, org_id, email, display_name, role, approved }
+  let currentOrg = null;    // { id, tax_id, name, address, phone, email, logo_url }
+
+  const STORAGE_KEY = 'ecoco_quotes_v2';
+  const LOGO_KEY = 'ecoco_logo_v2';
+  const LANG_KEY = 'ecoco_lang_v2';
+
+  const i18n = {
+    zh: {
+      quotation_tool: '報價單工具', tab_editor: '編輯', tab_history: '歷史',
+      upload_logo: '上傳 Logo',
+      quote_no: '報價單編號', quote_date: '日期', valid_until: '有效期至', currency: '貨幣',
+      from: '寄件方', to: '客戶',
+      company_name: '公司名稱', client_name: '客戶名稱',
+      contact_person: '報價人', contact_person_to: '聯絡人',
+      address: '地址', phone: '電話', email: 'Email', tax_id: '統一編號',
+      items: '項目', desc: '品名 / 描述', qty: '數量', unit_price: '單價', amount: '小計',
+      add_item: '新增項目', notes: '備註 / 條款',
+      subtotal: '小計', discount: '折扣', tax: '稅金', total: '總計',
+      save: '儲存', new: '新報價單', print: '列印', pdf: '匯出 PDF',
+      history_title: '歷史報價', no_history: '尚無儲存的報價單',
+      load: '載入', delete: '刪除',
+      saved: '已儲存', deleted: '已刪除', loaded: '已載入',
+      contact_ph: '負責此報價的聯絡人',
+      notes_ph: '付款條件、交貨方式、保固、其他備註...',
+      item_ph: '品名或服務說明',
+      quotation: '報價單',
+      confirm_delete: '確定刪除這筆報價單？',
+      generating_pdf: 'PDF 產生中...',
+      send_email: '寄送給客戶',
+      review_email: '審核寄送內容',
+      step_review: '編輯與預覽',
+      step_confirm: '最終確認',
+      to_email: '收件人 Email',
+      to_email_hint: '預設帶入客戶資料區的 Email，可手動修改',
+      cc_email: 'CC（副本）',
+      bcc_email: 'BCC（密件副本）',
+      mail_subject: '主旨',
+      mail_body: '內文',
+      attach_hint: 'PDF 會自動下載；開啟郵件草稿後請將下載的 PDF 拖入信件附件區。',
+      info_title: '📌 寄送方式說明',
+      info_desc: '點下「下一步」後，瀏覽器會：<br>1. 自動下載報價單 PDF 到您的電腦<br>2. 開啟系統預設郵件程式並帶入收件人、主旨、內文<br>3. 您只需在郵件草稿中加入剛下載的 PDF 為附件，並按送出即可',
+      warn_no_email: '無法寄送',
+      warn_no_email_desc: '客戶 Email 為空，請先到客戶資料區填寫 Email 後再試。',
+      cancel: '取消', back: '← 返回修改',
+      next_review: '下一步：最終確認',
+      confirm_send: '確定寄送',
+      confirm_title: '確定寄送此報價單？',
+      confirm_warn_title: '⚠ 寄出後將無法收回',
+      confirm_warn_desc: '請再次確認收件人、主旨與報價金額正確無誤。',
+      conf_to: '收件人',
+      conf_subject: '主旨',
+      conf_quote: '報價單號',
+      conf_total: '總金額',
+      conf_attach: '附件',
+      mail_subject_tpl: '【{{from}} 報價單】{{quoteNo}} — {{client}}',
+      mail_body_tpl: '{{client}} {{contact}}您好，\n\n感謝您的詢價，謹此附上報價單，詳細內容請參閱附件 PDF。\n\n報價單編號：{{quoteNo}}\n報價日期：{{date}}\n有效期至：{{validUntil}}\n總金額：{{total}}\n\n如有任何疑問或需要進一步說明，歡迎隨時與我聯繫。\n期待與您的合作，謝謝。\n\n敬祝商祺\n\n{{from}}\n{{issuer}}\n{{phone}}\n{{email}}',
+      sent_hint: '已開啟郵件草稿，請確認附件後送出',
+      tab_clients: '客戶', tab_products: '品項',
+      duplicate: '複製', search_ph: '搜尋客戶名、報價單號...',
+      data_mgmt: '資料備份',
+      data_mgmt_desc: '所有資料儲存在瀏覽器本地，建議定期備份。換電腦時匯入備份即可還原。',
+      export_data: '匯出全部資料', import_data: '匯入備份',
+      clients_title: '客戶簿', add_client: '新增客戶', pick_client: '選取客戶',
+      products_title: '常用品項', add_product: '新增品項', pick_product: '從品項庫',
+      no_clients: '尚無儲存的客戶。儲存報價單時會自動加入。',
+      no_products: '尚無常用品項',
+      pick_client_title: '選取客戶', pick_product_title: '選取品項',
+      edit_client: '編輯客戶', edit_product: '編輯品項',
+      product_name: '品項名稱', product_price: '預設單價',
+      saved_client: '客戶已儲存', saved_product: '品項已儲存',
+      duplicated: '已複製為新報價單',
+      import_success: '匯入成功', import_fail: '匯入失敗：檔案格式錯誤',
+      confirm_import: '匯入會覆蓋現有資料，確定繼續？',
+      // Auth
+      auth_subtitle: '線上報價單管理工具',
+      brand_title: '報價單系統',
+      auth_login: '登入', auth_register: '註冊',
+      password: '密碼', your_name: '您的姓名',
+      pwd_hint: '至少 8 碼',
+      reg_company_hint: '第一個註冊此統編的人需填寫，後續同統編註冊會自動帶入',
+      logout: '登出',
+      pending_title: '等待管理員審核',
+      pending_desc: '您的帳號已建立，但需要組織管理員核准後才能使用系統。請聯絡您公司的管理員。',
+      // Errors
+      err_invalid_login: '帳號或密碼錯誤',
+      err_email_taken: '此 Email 已被註冊',
+      err_weak_password: '密碼太弱，請至少 8 碼',
+      err_required: '請填寫所有必填欄位',
+      err_invalid_taxid: '統一編號格式錯誤（應為 8 位數字）',
+      err_invalid_email: 'Email 格式錯誤',
+      err_network: '網路錯誤，請稍後再試',
+      // Org
+      tab_org: '組織', tab_members: '成員',
+      org_title: '組織資料',
+      org_desc: '這裡的資料會自動帶入每張新報價單的「寄件方」欄位。',
+      // Members
+      pending_members: '待審核成員',
+      active_members: '組織成員',
+      no_pending: '目前沒有待審核成員',
+      approve: '核准',
+      role_admin: '管理員', role_member: '成員',
+      // Sync
+      syncing: '同步中...',
+      synced: '已同步',
+      sync_error: '同步失敗'
+    },
+    en: {
+      quotation_tool: 'Quotation Tool', tab_editor: 'Editor', tab_history: 'History',
+      upload_logo: 'Upload Logo',
+      quote_no: 'Quote No.', quote_date: 'Date', valid_until: 'Valid Until', currency: 'Currency',
+      from: 'From', to: 'Bill To',
+      company_name: 'Company', client_name: 'Client',
+      contact_person: 'Issued By', contact_person_to: 'Contact',
+      address: 'Address', phone: 'Phone', email: 'Email', tax_id: 'Tax ID',
+      items: 'Items', desc: 'Description', qty: 'Qty', unit_price: 'Unit Price', amount: 'Amount',
+      add_item: 'Add item', notes: 'Notes / Terms',
+      subtotal: 'Subtotal', discount: 'Discount', tax: 'Tax', total: 'Total',
+      save: 'Save', new: 'New', print: 'Print', pdf: 'Export PDF',
+      history_title: 'Saved Quotations', no_history: 'No saved quotations yet',
+      load: 'Load', delete: 'Delete',
+      saved: 'Saved', deleted: 'Deleted', loaded: 'Loaded',
+      contact_ph: 'Person who issued this quote',
+      notes_ph: 'Payment terms, delivery, warranty, remarks...',
+      item_ph: 'Product or service description',
+      quotation: 'QUOTATION',
+      confirm_delete: 'Delete this quotation?',
+      generating_pdf: 'Generating PDF...',
+      send_email: 'Send to Client',
+      review_email: 'Review Email',
+      step_review: 'Review & Edit',
+      step_confirm: 'Final Confirm',
+      to_email: 'Recipient',
+      to_email_hint: 'Pre-filled from client info — editable',
+      cc_email: 'CC',
+      bcc_email: 'BCC',
+      mail_subject: 'Subject',
+      mail_body: 'Message',
+      attach_hint: 'PDF will be auto-downloaded. Drag it into your email draft as an attachment before sending.',
+      info_title: '📌 How sending works',
+      info_desc: 'After clicking Next, your browser will:<br>1. Auto-download the quotation PDF<br>2. Open your default mail app with recipient/subject/body filled in<br>3. Just attach the downloaded PDF and hit send',
+      warn_no_email: 'Cannot Send',
+      warn_no_email_desc: 'Client Email is empty. Please fill in the client Email field first.',
+      cancel: 'Cancel', back: '← Back',
+      next_review: 'Next: Final Confirm',
+      confirm_send: 'Confirm & Send',
+      confirm_title: 'Send this quotation?',
+      confirm_warn_title: '⚠ This action cannot be undone',
+      confirm_warn_desc: 'Please verify the recipient, subject, and total amount are correct.',
+      conf_to: 'To',
+      conf_subject: 'Subject',
+      conf_quote: 'Quote No.',
+      conf_total: 'Total',
+      conf_attach: 'Attachment',
+      mail_subject_tpl: '[{{from}} Quotation] {{quoteNo}} — {{client}}',
+      mail_body_tpl: 'Dear {{contact}},\n\nThank you for your inquiry. Please find attached our quotation for your review.\n\nQuote No.: {{quoteNo}}\nIssue Date: {{date}}\nValid Until: {{validUntil}}\nTotal Amount: {{total}}\n\nShould you have any questions or require further clarification, please do not hesitate to contact me.\n\nWe look forward to working with you.\n\nBest regards,\n\n{{issuer}}\n{{from}}\n{{phone}}\n{{email}}',
+      sent_hint: 'Mail draft opened. Attach the PDF and send.',
+      tab_clients: 'Clients', tab_products: 'Items',
+      duplicate: 'Duplicate', search_ph: 'Search by name, quote no...',
+      data_mgmt: 'Data Backup',
+      data_mgmt_desc: 'All data is stored locally in your browser. Export regularly to back up. Import to restore on another device.',
+      export_data: 'Export All Data', import_data: 'Import Backup',
+      clients_title: 'Client Book', add_client: 'Add Client', pick_client: 'Pick Client',
+      products_title: 'Saved Items', add_product: 'Add Item', pick_product: 'From Library',
+      no_clients: 'No saved clients yet. Saving a quote will auto-save the client.',
+      no_products: 'No saved items yet',
+      pick_client_title: 'Select Client', pick_product_title: 'Select Item',
+      edit_client: 'Edit Client', edit_product: 'Edit Item',
+      product_name: 'Item Name', product_price: 'Default Price',
+      saved_client: 'Client saved', saved_product: 'Item saved',
+      duplicated: 'Duplicated as new quote',
+      import_success: 'Import successful', import_fail: 'Import failed: invalid file',
+      confirm_import: 'Import will overwrite existing data. Continue?',
+      // Auth
+      auth_subtitle: 'Online Quotation Manager',
+      brand_title: 'Quotation System',
+      auth_login: 'Login', auth_register: 'Register',
+      password: 'Password', your_name: 'Your Name',
+      pwd_hint: 'min 8 chars',
+      reg_company_hint: 'The first person to register this tax ID enters the company name. Later registrations inherit it.',
+      logout: 'Logout',
+      pending_title: 'Pending Approval',
+      pending_desc: 'Your account is created but requires admin approval before use. Please contact your organization admin.',
+      // Errors
+      err_invalid_login: 'Invalid email or password',
+      err_email_taken: 'Email already registered',
+      err_weak_password: 'Password too weak (min 8 chars)',
+      err_required: 'Please fill all required fields',
+      err_invalid_taxid: 'Tax ID must be 8 digits',
+      err_invalid_email: 'Invalid email format',
+      err_network: 'Network error, please try again',
+      // Org
+      tab_org: 'Org', tab_members: 'Members',
+      org_title: 'Organization',
+      org_desc: 'This info auto-fills the "From" section of every new quote.',
+      // Members
+      pending_members: 'Pending Members',
+      active_members: 'Active Members',
+      no_pending: 'No pending members',
+      approve: 'Approve',
+      role_admin: 'Admin', role_member: 'Member',
+      // Sync
+      syncing: 'Syncing...',
+      synced: 'Synced',
+      sync_error: 'Sync failed'
+    }
+  };
+
+  const currencies = {
+    TWD: { symbol: 'NT$', decimals: 0, locale: 'zh-TW' },
+    USD: { symbol: '$',   decimals: 2, locale: 'en-US' },
+    EUR: { symbol: '€',   decimals: 2, locale: 'de-DE' },
+    JPY: { symbol: '¥',   decimals: 0, locale: 'ja-JP' },
+    CNY: { symbol: '¥',   decimals: 2, locale: 'zh-CN' },
+    GBP: { symbol: '£',   decimals: 2, locale: 'en-GB' },
+    HKD: { symbol: 'HK$', decimals: 2, locale: 'zh-HK' },
+    SGD: { symbol: 'S$',  decimals: 2, locale: 'en-SG' }
+  };
+
+  function safeGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+  function safeSet(k,v){
+    try { localStorage.setItem(k,v); return true; }
+    catch(e){
+      if(e && e.name && (e.name === 'QuotaExceededError' || e.code === 22)){
+        alert(state.lang === 'en'
+          ? 'Storage full. Please export data and remove old quotes/logo.'
+          : '瀏覽器儲存空間已滿，請先匯出備份並移除舊資料或 Logo。');
+      }
+      return false;
+    }
+  }
+  // ==========================================
+  // DATA LAYER — local cache + Supabase sync
+  // ==========================================
+  // Strategy: read from local cache instantly; write to local + push to Supabase async.
+  // On login, pull from Supabase to refresh cache.
+
+  let syncing = 0;
+  function setSyncing(on, error){
+    const el = $('sync-indicator');
+    if(!el) return;
+    if(error){ el.className = 'sync-indicator error'; el.textContent = t('sync_error'); return; }
+    if(on){ syncing++; } else { syncing = Math.max(0, syncing-1); }
+    if(syncing > 0){ el.className = 'sync-indicator syncing'; el.textContent = t('syncing'); }
+    else { el.className = 'sync-indicator'; el.textContent = ''; }
+  }
+
+  // Quotes
+  function loadQuotes(){
+    if(!currentMember) return [];
+    const key = 'ecoco_quotes_' + currentMember.org_id;
+    const r = safeGet(key); if(r){ try { return JSON.parse(r); } catch(e){} } return [];
+  }
+  function saveQuotes(a){
+    if(!currentMember) return;
+    const key = 'ecoco_quotes_' + currentMember.org_id;
+    safeSet(key, JSON.stringify(a));
+  }
+
+  async function syncQuotesFromCloud(){
+    if(!currentMember) return;
+    setSyncing(true);
+    try {
+      const { data, error } = await supa.from('quotes')
+        .select('*').order('created_at', { ascending: false });
+      if(error) throw error;
+      const local = (data || []).map(q => ({
+        id: q.id,
+        savedAt: q.updated_at || q.created_at,
+        lang: state.lang,
+        currency: q.currency,
+        quoteNo: q.quote_no,
+        quoteDate: q.quote_date,
+        validUntil: q.valid_until,
+        from: q.client_data && q.client_data.from || {},
+        to: q.client_data && q.client_data.to || {},
+        items: q.items || [],
+        notes: q.notes,
+        discType: q.disc_type,
+        discVal: parseFloat(q.disc_val)||0,
+        taxRate: parseFloat(q.tax_rate)||0,
+        total: parseFloat(q.total)||0
+      }));
+      saveQuotes(local);
+      setSyncing(false);
+    } catch(e){ console.error(e); setSyncing(false, true); }
+  }
+
+  async function pushQuoteToCloud(snap){
+    if(!currentMember) return;
+    setSyncing(true);
+    try {
+      const row = {
+        id: snap.id,
+        org_id: currentMember.org_id,
+        created_by: currentUser.id,
+        quote_no: snap.quoteNo || '',
+        quote_date: snap.quoteDate || null,
+        valid_until: snap.validUntil || null,
+        currency: snap.currency || 'TWD',
+        client_data: { from: snap.from || {}, to: snap.to || {} },
+        items: snap.items || [],
+        notes: snap.notes || '',
+        disc_type: snap.discType || 'pct',
+        disc_val: snap.discVal || 0,
+        tax_rate: snap.taxRate || 0,
+        total: snap.total || 0
+      };
+      const { error } = await supa.from('quotes').upsert(row);
+      if(error) throw error;
+      setSyncing(false);
+    } catch(e){ console.error('quote push failed', e); setSyncing(false, true); }
+  }
+
+  async function deleteQuoteFromCloud(id){
+    if(!currentMember) return;
+    try { await supa.from('quotes').delete().eq('id', id); }
+    catch(e){ console.error(e); }
+  }
+  function loadLogo(){ return safeGet(LOGO_KEY); }
+  function saveLogo(v){ safeSet(LOGO_KEY, v); }
+  function clearLogo(){ try { localStorage.removeItem(LOGO_KEY); } catch(e){} }
+
+  let state = {
+    lang: safeGet(LANG_KEY) || 'zh',
+    items: [{desc:'', qty:1, price:0}]
+  };
+  const $ = id => document.getElementById(id);
+  const t = k => (i18n[state.lang] && i18n[state.lang][k]) || k;
+
+  function applyI18n(){
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.getAttribute('data-i18n');
+      const v = t(k);
+      if(k === 'info_desc' || /<br>|<strong>/.test(v)) el.innerHTML = v;
+      else el.textContent = v;
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-ph')));
+    document.documentElement.lang = state.lang === 'en' ? 'en' : 'zh-Hant';
+  }
+
+  function fmt(n){
+    const c = currencies[$('currency').value] || currencies.TWD;
+    const r = Math.round(n*100)/100;
+    try {
+      return new Intl.NumberFormat(c.locale, { minimumFractionDigits:c.decimals, maximumFractionDigits:c.decimals }).format(r);
+    } catch(e){ return r.toFixed(c.decimals); }
+  }
+  function curSym(){ return (currencies[$('currency').value] || currencies.TWD).symbol; }
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+  function todayStr(off){ const d = new Date(); d.setDate(d.getDate()+(off||0)); return d.toISOString().slice(0,10); }
+  function genQuoteNo(){
+    const d = new Date();
+    const ymd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+    return 'Q-' + ymd + '-' + String(Math.floor(Math.random()*900+100));
+  }
+
+  function renderItems(){
+    const tb = $('items-body');
+    tb.innerHTML = '';
+    const lDesc = t('desc'), lQty = t('qty'), lPrice = t('unit_price'), lTotal = t('amount');
+    state.items.forEach((it, idx) => {
+      const tr = document.createElement('tr');
+      tr.dataset.row = idx + 1;
+      // Ensure qty/price are numbers to prevent any HTML injection from imported/tampered data
+      const safeQty = parseFloat(it.qty) || 0;
+      const safePrice = parseFloat(it.price) || 0;
+      tr.innerHTML =
+        '<td class="col-desc" data-label="'+(idx+1)+'. '+lDesc+'"><textarea data-idx="'+idx+'" data-k="desc" placeholder="'+t('item_ph')+'" rows="1">'+escapeHtml(it.desc)+'</textarea></td>'+
+        '<td class="col-qty" data-label="'+lQty+'"><input type="number" inputmode="decimal" data-idx="'+idx+'" data-k="qty" value="'+safeQty+'" min="0" step="0.01" /></td>'+
+        '<td class="col-price" data-label="'+lPrice+'"><input type="number" inputmode="decimal" data-idx="'+idx+'" data-k="price" value="'+safePrice+'" min="0" step="0.01" /></td>'+
+        '<td class="col-total line-total" data-label="'+lTotal+'" id="line-'+idx+'">0.00</td>'+
+        '<td class="col-act"><button class="row-del" data-del="'+idx+'" aria-label="delete">×</button></td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll('input,textarea').forEach(el => {
+      el.addEventListener('input', e => {
+        const i = +e.target.dataset.idx, k = e.target.dataset.k;
+        state.items[i][k] = k === 'desc' ? e.target.value : (parseFloat(e.target.value) || 0);
+        recalc();
+      });
+    });
+    tb.querySelectorAll('[data-del]').forEach(b => {
+      b.addEventListener('click', e => {
+        const i = +e.currentTarget.dataset.del;
+        state.items.splice(i,1);
+        if(state.items.length === 0) state.items.push({desc:'',qty:1,price:0});
+        renderItems();
+      });
+    });
+    recalc();
+  }
+
+  function recalc(){
+    let sub = 0;
+    state.items.forEach((it, idx) => {
+      const line = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
+      const cell = $('line-'+idx);
+      if(cell) cell.textContent = curSym() + ' ' + fmt(line);
+      sub += line;
+    });
+    const dt = $('disc-type').value;
+    const dv = parseFloat($('disc-val').value) || 0;
+    const disc = dt === 'pct' ? sub * dv / 100 : dv;
+    const taxable = Math.max(0, sub - disc);
+    const tr = parseFloat($('tax-rate').value) || 0;
+    const tax = taxable * tr / 100;
+    const total = taxable + tax;
+    $('subtotal').textContent = curSym() + ' ' + fmt(sub);
+    $('discount').textContent = '−' + curSym() + ' ' + fmt(disc);
+    $('tax').textContent = curSym() + ' ' + fmt(tax);
+    $('total').textContent = curSym() + ' ' + fmt(total);
+    return { sub, disc, tax, total };
+  }
+
+  function newQuote(){
+    state.items = [{desc:'',qty:1,price:0}];
+    $('quote-no').value = genQuoteNo();
+    $('quote-date').value = todayStr(0);
+    $('valid-until').value = todayStr(30);
+    $('to-name').value = ''; $('to-contact').value = '';
+    $('to-address').value = ''; $('to-phone').value = '';
+    $('to-email').value = ''; $('to-tax').value = '';
+    $('notes').value = '';
+    $('disc-val').value = 0; $('tax-rate').value = 5;
+    renderItems();
+  }
+
+  function snapshot(){
+    return {
+      id: $('quote-no').value || genQuoteNo(),
+      savedAt: new Date().toISOString(),
+      lang: state.lang,
+      currency: $('currency').value,
+      quoteNo: $('quote-no').value,
+      quoteDate: $('quote-date').value,
+      validUntil: $('valid-until').value,
+      from: {
+        name: $('from-name').value,
+        contact: $('from-contact').value,
+        address: $('from-address').value,
+        phone: $('from-phone').value,
+        email: $('from-email').value,
+        taxId: $('from-tax').value
+      },
+      to: {
+        name: $('to-name').value,
+        contact: $('to-contact').value,
+        address: $('to-address').value,
+        phone: $('to-phone').value,
+        email: $('to-email').value,
+        taxId: $('to-tax').value
+      },
+      items: JSON.parse(JSON.stringify(state.items)),
+      notes: $('notes').value,
+      discType: $('disc-type').value,
+      discVal: parseFloat($('disc-val').value)||0,
+      taxRate: parseFloat($('tax-rate').value)||0,
+      total: recalc().total
+    };
+  }
+
+  function loadSnapshot(q){
+    $('currency').value = q.currency || 'TWD';
+    $('quote-no').value = q.quoteNo || '';
+    $('quote-date').value = q.quoteDate || todayStr(0);
+    $('valid-until').value = q.validUntil || todayStr(30);
+    const f = q.from || {}, t2 = q.to || {};
+    $('from-name').value = f.name || '';
+    $('from-contact').value = f.contact || '';
+    $('from-address').value = f.address || '';
+    $('from-phone').value = f.phone || '';
+    $('from-email').value = f.email || '';
+    $('from-tax').value = f.taxId || '';
+    $('to-name').value = t2.name || '';
+    $('to-contact').value = t2.contact || '';
+    $('to-address').value = t2.address || '';
+    $('to-phone').value = t2.phone || '';
+    $('to-email').value = t2.email || '';
+    $('to-tax').value = t2.taxId || '';
+    $('notes').value = q.notes || '';
+    $('disc-type').value = q.discType || 'pct';
+    $('disc-val').value = q.discVal || 0;
+    $('tax-rate').value = q.taxRate != null ? q.taxRate : 5;
+    state.items = (q.items && q.items.length) ? q.items : [{desc:'',qty:1,price:0}];
+    renderItems();
+  }
+
+  function toast(msg, type){
+    const el = $('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(el._tid);
+    el._tid = setTimeout(() => el.className = 'toast', 2400);
+  }
+
+  function renderHistory(){
+    const list = $('history-list');
+    const q = (($('history-search') && $('history-search').value) || '').toLowerCase();
+    const arr = loadQuotes()
+      .filter(x => !q || ((x.quoteNo||'') + ' ' + ((x.to&&x.to.name)||'')).toLowerCase().includes(q))
+      .sort((a,b) => (b.savedAt||'').localeCompare(a.savedAt||''));
+    if(arr.length === 0){ list.innerHTML = '<div class="empty">'+t('no_history')+'</div>'; return; }
+    list.innerHTML = '';
+    arr.forEach(q => {
+      const c = currencies[q.currency] || currencies.TWD;
+      const totalStr = c.symbol + ' ' + (Math.round((q.total||0)*100)/100).toLocaleString();
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.innerHTML =
+        '<div class="history-meta">'+
+          '<strong>'+escapeHtml(q.quoteNo||q.id)+' — '+escapeHtml((q.to&&q.to.name)||'—')+'</strong>'+
+          '<span>'+(q.savedAt||'').slice(0,10)+' · '+totalStr+'</span>'+
+        '</div>'+
+        '<div class="history-actions">'+
+          '<button class="btn" data-load="'+escapeHtml(q.id)+'">↗ '+t('load')+'</button>'+
+          '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">🗑</button>'+
+        '</div>';
+      list.appendChild(div);
+    });
+    list.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', e => {
+      const id = e.currentTarget.dataset.load;
+      const q = loadQuotes().find(x => x.id === id);
+      if(q){ loadSnapshot(q); switchTab('editor'); toast(t('loaded')); }
+    }));
+    list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', e => {
+      if(!confirm(t('confirm_delete'))) return;
+      const id = e.currentTarget.dataset.del;
+      saveQuotes(loadQuotes().filter(x => x.id !== id));
+      renderHistory(); toast(t('deleted'));
+    }));
+  }
+
+  function switchTab(name){
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    ['editor','history','clients','products'].forEach(n => {
+      const el = $('tab-'+n);
+      if(el) el.style.display = name === n ? '' : 'none';
+    });
+    if(name === 'history') renderHistory();
+    if(name === 'clients') renderClientsList();
+    if(name === 'products') renderProductsList();
+  }
+
+  // --- PDF Export via html2canvas (preserves CJK fonts) ---
+  async function exportPDF(){
+    toast(t('generating_pdf'));
+    const node = buildPdfNode();
+    document.body.appendChild(node);
+    try {
+      const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW;
+      const imgH = canvas.height * imgW / canvas.width;
+
+      if(imgH <= pageH){
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+      } else {
+        // Multi-page: slice
+        let remaining = imgH;
+        let position = 0;
+        while(remaining > 0){
+          pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+          remaining -= pageH;
+          if(remaining > 0){ pdf.addPage(); position -= pageH; }
+        }
+      }
+      const filename = ($('quote-no').value || 'quotation') + '.pdf';
+      pdf.save(filename);
+    } catch(err){
+      console.error(err);
+      alert('PDF export failed: ' + err.message);
+    } finally {
+      node.remove();
+    }
+  }
+
+  function buildPdfNode(){
+    const calc = recalc();
+    const sym = curSym();
+    const n = document.createElement('div');
+    const logo = $('logo-img').src && $('logo-img').style.display !== 'none' ? $('logo-img').src : '';
+    n.style.cssText = 'position:fixed; left:-99999px; top:0; width:794px; padding:48px 56px; background:white; font-family:"Noto Sans TC","Inter",sans-serif; color:#1a1a1a; font-size:13px; line-height:1.6;';
+
+    const fromBlock = [
+      $('from-name').value && '<strong style="font-size:14px">'+escapeHtml($('from-name').value)+'</strong>',
+      $('from-contact').value && (state.lang==='en'?'Issued by: ':'報價人：')+escapeHtml($('from-contact').value),
+      $('from-address').value && escapeHtml($('from-address').value),
+      $('from-phone').value && (state.lang==='en'?'Tel: ':'電話：')+escapeHtml($('from-phone').value),
+      $('from-email').value && (state.lang==='en'?'Email: ':'Email：')+escapeHtml($('from-email').value),
+      $('from-tax').value && (state.lang==='en'?'Tax ID: ':'統編：')+escapeHtml($('from-tax').value)
+    ].filter(Boolean).join('<br>');
+
+    const toBlock = [
+      $('to-name').value && '<strong style="font-size:14px">'+escapeHtml($('to-name').value)+'</strong>',
+      $('to-contact').value && (state.lang==='en'?'Attn: ':'聯絡人：')+escapeHtml($('to-contact').value),
+      $('to-address').value && escapeHtml($('to-address').value),
+      $('to-phone').value && (state.lang==='en'?'Tel: ':'電話：')+escapeHtml($('to-phone').value),
+      $('to-email').value && (state.lang==='en'?'Email: ':'Email：')+escapeHtml($('to-email').value),
+      $('to-tax').value && (state.lang==='en'?'Tax ID: ':'統編：')+escapeHtml($('to-tax').value)
+    ].filter(Boolean).join('<br>');
+
+    let rows = '';
+    state.items.forEach((it, i) => {
+      const line = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+      rows += '<tr style="border-bottom:1px solid #eee">'+
+        '<td style="padding:10px 6px; vertical-align:top">'+escapeHtml(it.desc||'-').replace(/\n/g,'<br>')+'</td>'+
+        '<td style="padding:10px 6px; text-align:right; vertical-align:top">'+it.qty+'</td>'+
+        '<td style="padding:10px 6px; text-align:right; vertical-align:top">'+sym+' '+fmt(parseFloat(it.price)||0)+'</td>'+
+        '<td style="padding:10px 6px; text-align:right; vertical-align:top">'+sym+' '+fmt(line)+'</td>'+
+      '</tr>';
+    });
+
+    const headerName = ($('from-name').value || '').trim() || t('quotation_tool');
+    n.innerHTML =
+      '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; border-bottom:2px solid #1a1a1a; padding-bottom:20px">'+
+        '<div style="display:flex; align-items:center; gap:16px">'+
+          (logo ? '<img src="'+logo+'" style="width:64px; height:64px; object-fit:contain" />' : '')+
+          '<div>'+
+            '<div style="font-size:26px; font-weight:600; letter-spacing:1px">'+escapeHtml(headerName)+'</div>'+
+            '<div style="font-size:12px; color:#666; margin-top:2px">'+t('quotation_tool')+'</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:28px; font-weight:600; letter-spacing:2px">'+t('quotation')+'</div>'+
+          '<div style="font-size:12px; color:#666; margin-top:6px">'+
+            '<div>'+t('quote_no')+'：<strong>'+escapeHtml($('quote-no').value)+'</strong></div>'+
+            '<div>'+t('quote_date')+'：'+escapeHtml($('quote-date').value)+'</div>'+
+            '<div>'+t('valid_until')+'：'+escapeHtml($('valid-until').value)+'</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-bottom:28px">'+
+        '<div>'+
+          '<div style="font-size:11px; font-weight:600; color:#999; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px">'+t('from')+'</div>'+
+          '<div style="font-size:13px">'+fromBlock+'</div>'+
+        '</div>'+
+        '<div>'+
+          '<div style="font-size:11px; font-weight:600; color:#999; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px">'+t('to')+'</div>'+
+          '<div style="font-size:13px">'+toBlock+'</div>'+
+        '</div>'+
+      '</div>'+
+
+      '<table style="width:100%; border-collapse:collapse; margin-bottom:20px">'+
+        '<thead><tr style="background:#1a1a1a; color:white">'+
+          '<th style="padding:10px 6px; text-align:left; font-size:11px; font-weight:500; letter-spacing:0.5px">'+t('desc')+'</th>'+
+          '<th style="padding:10px 6px; text-align:right; font-size:11px; font-weight:500; width:60px">'+t('qty')+'</th>'+
+          '<th style="padding:10px 6px; text-align:right; font-size:11px; font-weight:500; width:110px">'+t('unit_price')+'</th>'+
+          '<th style="padding:10px 6px; text-align:right; font-size:11px; font-weight:500; width:120px">'+t('amount')+'</th>'+
+        '</tr></thead>'+
+        '<tbody>'+rows+'</tbody>'+
+      '</table>'+
+
+      '<div style="display:flex; justify-content:flex-end; margin-bottom:24px">'+
+        '<table style="width:280px; font-size:13px">'+
+          '<tr><td style="padding:5px 0; color:#666">'+t('subtotal')+'</td><td style="padding:5px 0; text-align:right">'+sym+' '+fmt(calc.sub)+'</td></tr>'+
+          '<tr><td style="padding:5px 0; color:#666">'+t('discount')+'</td><td style="padding:5px 0; text-align:right">−'+sym+' '+fmt(calc.disc)+'</td></tr>'+
+          '<tr><td style="padding:5px 0; color:#666">'+t('tax')+' ('+($('tax-rate').value||0)+'%)</td><td style="padding:5px 0; text-align:right">'+sym+' '+fmt(calc.tax)+'</td></tr>'+
+          '<tr style="border-top:2px solid #1a1a1a"><td style="padding:10px 0 0; font-weight:600; font-size:16px">'+t('total')+'</td><td style="padding:10px 0 0; text-align:right; font-weight:600; font-size:16px">'+sym+' '+fmt(calc.total)+'</td></tr>'+
+        '</table>'+
+      '</div>'+
+
+      ($('notes').value.trim() ? '<div style="border-top:1px solid #eee; padding-top:16px; margin-top:8px">'+
+        '<div style="font-size:11px; font-weight:600; color:#999; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px">'+t('notes')+'</div>'+
+        '<div style="font-size:12px; color:#444; white-space:pre-wrap">'+escapeHtml($('notes').value)+'</div>'+
+      '</div>' : '')+
+
+      '<div style="margin-top:48px; padding-top:16px; border-top:1px solid #eee; font-size:11px; color:#999; text-align:center">'+escapeHtml(headerName)+' · '+new Date().getFullYear()+'</div>';
+
+    return n;
+  }
+
+  // --- Logo upload ---
+  $('logo-slot').addEventListener('click', e => {
+    if(e.target.id === 'logo-remove') return;
+    $('logo-input').click();
+  });
+  $('logo-input').addEventListener('change', e => {
+    const f = e.target.files[0]; if(!f) return;
+    if(!f.type.startsWith('image/')){
+      alert(state.lang === 'en' ? 'Please select an image file' : '請選擇圖片檔案');
+      return;
+    }
+    if(f.size > 5 * 1024 * 1024){
+      alert(state.lang === 'en' ? 'Image too large (max 5MB)' : '圖片過大（上限 5MB）');
+      return;
+    }
+    const r = new FileReader();
+    r.onload = ev => {
+      // If image is large, compress via canvas to stay under localStorage quota
+      const dataUrl = ev.target.result;
+      if(dataUrl.length > 500 * 1024){
+        compressImage(dataUrl, 256, compressed => {
+          saveLogo(compressed); showLogo(compressed);
+        });
+      } else {
+        saveLogo(dataUrl); showLogo(dataUrl);
+      }
+    };
+    r.readAsDataURL(f);
+  });
+
+  function compressImage(dataUrl, maxDim, cb){
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if(w > h){
+        if(w > maxDim){ h = h * maxDim / w; w = maxDim; }
+      } else {
+        if(h > maxDim){ w = w * maxDim / h; h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      try { cb(canvas.toDataURL('image/png')); }
+      catch(e){ cb(dataUrl); }
+    };
+    img.onerror = () => cb(dataUrl);
+    img.src = dataUrl;
+  }
+  $('logo-remove').addEventListener('click', e => {
+    e.stopPropagation();
+    clearLogo();
+    $('logo-img').src = '';
+    $('logo-img').style.display = 'none';
+    $('logo-placeholder').style.display = '';
+    $('logo-slot').classList.remove('has-image');
+    $('logo-input').value = '';
+  });
+  function showLogo(data){
+    $('logo-img').src = data;
+    $('logo-img').style.display = 'block';
+    $('logo-placeholder').style.display = 'none';
+    $('logo-slot').classList.add('has-image');
+  }
+
+  // --- Clients & Products store ---
+  const CLIENTS_KEY = 'ecoco_clients_v1';
+  const PRODUCTS_KEY = 'ecoco_products_v1';
+  function loadClients(){
+    if(!currentMember) return [];
+    const key = 'ecoco_clients_' + currentMember.org_id;
+    const r = safeGet(key); if(r){ try { return JSON.parse(r); } catch(e){} } return [];
+  }
+  function saveClients(a){
+    if(!currentMember) return;
+    const key = 'ecoco_clients_' + currentMember.org_id;
+    safeSet(key, JSON.stringify(a));
+  }
+  function loadProducts(){
+    if(!currentMember) return [];
+    const key = 'ecoco_products_' + currentMember.org_id;
+    const r = safeGet(key); if(r){ try { return JSON.parse(r); } catch(e){} } return [];
+  }
+  function saveProducts(a){
+    if(!currentMember) return;
+    const key = 'ecoco_products_' + currentMember.org_id;
+    safeSet(key, JSON.stringify(a));
+  }
+
+  async function syncClientsFromCloud(){
+    if(!currentMember) return;
+    setSyncing(true);
+    try {
+      const { data, error } = await supa.from('clients').select('*');
+      if(error) throw error;
+      const local = (data || []).map(c => ({
+        id: c.id, name: c.name, contact: c.contact || '',
+        address: c.address || '', phone: c.phone || '',
+        email: c.email || '', taxId: c.tax_id || ''
+      }));
+      saveClients(local);
+      setSyncing(false);
+    } catch(e){ console.error(e); setSyncing(false, true); }
+  }
+
+  async function pushClientToCloud(c){
+    if(!currentMember) return;
+    setSyncing(true);
+    try {
+      const row = {
+        id: c.id, org_id: currentMember.org_id,
+        name: c.name, contact: c.contact, address: c.address,
+        phone: c.phone, email: c.email, tax_id: c.taxId
+      };
+      const { error } = await supa.from('clients').upsert(row);
+      if(error) throw error;
+      setSyncing(false);
+    } catch(e){ console.error('client push failed', e); setSyncing(false, true); }
+  }
+
+  async function deleteClientFromCloud(id){
+    if(!currentMember) return;
+    try { await supa.from('clients').delete().eq('id', id); }
+    catch(e){ console.error(e); }
+  }
+
+  async function syncProductsFromCloud(){
+    if(!currentMember) return;
+    setSyncing(true);
+    try {
+      const { data, error } = await supa.from('products').select('*');
+      if(error) throw error;
+      const local = (data || []).map(p => ({
+        id: p.id, name: p.name, price: parseFloat(p.price)||0
+      }));
+      saveProducts(local);
+      setSyncing(false);
+    } catch(e){ console.error(e); setSyncing(false, true); }
+  }
+
+  async function pushProductToCloud(p){
+    if(!currentMember) return;
+    setSyncing(true);
+    try {
+      const row = {
+        id: p.id, org_id: currentMember.org_id,
+        name: p.name, price: p.price
+      };
+      const { error } = await supa.from('products').upsert(row);
+      if(error) throw error;
+      setSyncing(false);
+    } catch(e){ console.error('product push failed', e); setSyncing(false, true); }
+  }
+
+  async function deleteProductFromCloud(id){
+    if(!currentMember) return;
+    try { await supa.from('products').delete().eq('id', id); }
+    catch(e){ console.error(e); }
+  }
+  function uid(){ return 'id-' + Date.now() + '-' + Math.floor(Math.random()*9999); }
+
+  function getClientFromForm(){
+    return {
+      name: $('to-name').value.trim(),
+      contact: $('to-contact').value.trim(),
+      address: $('to-address').value.trim(),
+      phone: $('to-phone').value.trim(),
+      email: $('to-email').value.trim(),
+      taxId: $('to-tax').value.trim()
+    };
+  }
+  function applyClientToForm(c){
+    $('to-name').value = c.name || '';
+    $('to-contact').value = c.contact || '';
+    $('to-address').value = c.address || '';
+    $('to-phone').value = c.phone || '';
+    $('to-email').value = c.email || '';
+    $('to-tax').value = c.taxId || '';
+  }
+
+  function saveCurrentClient(){
+    const c = getClientFromForm();
+    if(!c.name){ alert(state.lang==='en'?'Client name is required':'請先填寫客戶名稱'); return; }
+    const arr = loadClients();
+    const i = arr.findIndex(x => x.name === c.name);
+    c.id = (i >= 0 && arr[i].id) ? arr[i].id : uid();
+    if(i >= 0) arr[i] = c; else arr.push(c);
+    saveClients(arr);
+    toast(t('saved_client'));
+  }
+
+  function renderClientsList(){
+    const list = $('clients-list');
+    const q = ($('client-search').value || '').toLowerCase();
+    const arr = loadClients().filter(c => !q || (c.name+c.contact+c.email).toLowerCase().includes(q));
+    if(arr.length === 0){ list.innerHTML = '<div class="empty">'+t('no_clients')+'</div>'; return; }
+    list.innerHTML = '';
+    arr.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.innerHTML =
+        '<div class="history-meta">'+
+          '<strong>'+escapeHtml(c.name)+'</strong>'+
+          '<span>'+escapeHtml([c.contact, c.email, c.phone].filter(Boolean).join(' · '))+'</span>'+
+        '</div>'+
+        '<div class="history-actions">'+
+          '<button class="btn" data-use="'+c.id+'">↗ '+t('load')+'</button>'+
+          '<button class="btn" data-edit-c="'+c.id+'">✎</button>'+
+          '<button class="btn" data-del-c="'+c.id+'" style="color:var(--danger)">🗑</button>'+
+        '</div>';
+      list.appendChild(div);
+    });
+    list.querySelectorAll('[data-use]').forEach(b => b.addEventListener('click', e => {
+      const c = loadClients().find(x => x.id === e.currentTarget.dataset.use);
+      if(c){ applyClientToForm(c); switchTab('editor'); toast(t('loaded')); }
+    }));
+    list.querySelectorAll('[data-edit-c]').forEach(b => b.addEventListener('click', e => {
+      const c = loadClients().find(x => x.id === e.currentTarget.dataset.editC);
+      if(c) openClientEditor(c);
+    }));
+    list.querySelectorAll('[data-del-c]').forEach(b => b.addEventListener('click', e => {
+      if(!confirm(t('confirm_delete'))) return;
+      saveClients(loadClients().filter(x => x.id !== e.currentTarget.dataset.delC));
+      renderClientsList();
+    }));
+  }
+
+  function renderProductsList(){
+    const list = $('products-list');
+    const q = ($('product-search').value || '').toLowerCase();
+    const arr = loadProducts().filter(p => !q || p.name.toLowerCase().includes(q));
+    if(arr.length === 0){ list.innerHTML = '<div class="empty">'+t('no_products')+'</div>'; return; }
+    list.innerHTML = '';
+    arr.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.innerHTML =
+        '<div class="history-meta">'+
+          '<strong>'+escapeHtml(p.name)+'</strong>'+
+          '<span>'+curSym()+' '+fmt(p.price||0)+'</span>'+
+        '</div>'+
+        '<div class="history-actions">'+
+          '<button class="btn" data-edit-p="'+p.id+'">✎</button>'+
+          '<button class="btn" data-del-p="'+p.id+'" style="color:var(--danger)">🗑</button>'+
+        '</div>';
+      list.appendChild(div);
+    });
+    list.querySelectorAll('[data-edit-p]').forEach(b => b.addEventListener('click', e => {
+      const p = loadProducts().find(x => x.id === e.currentTarget.dataset.editP);
+      if(p) openProductEditor(p);
+    }));
+    list.querySelectorAll('[data-del-p]').forEach(b => b.addEventListener('click', e => {
+      if(!confirm(t('confirm_delete'))) return;
+      saveProducts(loadProducts().filter(x => x.id !== e.currentTarget.dataset.delP));
+      renderProductsList();
+    }));
+  }
+
+  // --- Picker modal ---
+  let pickerMode = null; // 'client' | 'product'
+  function openPicker(mode){
+    pickerMode = mode;
+    $('picker-title').textContent = mode === 'client' ? t('pick_client_title') : t('pick_product_title');
+    $('picker-search').value = '';
+    renderPicker();
+    $('picker-modal').style.display = 'flex';
+    setTimeout(() => $('picker-search').focus(), 50);
+  }
+  function closePicker(){ $('picker-modal').style.display = 'none'; }
+  function renderPicker(){
+    const list = $('picker-list');
+    const q = ($('picker-search').value || '').toLowerCase();
+    let arr = pickerMode === 'client' ? loadClients() : loadProducts();
+    arr = arr.filter(x => !q || (pickerMode==='client' ? (x.name+x.contact+x.email).toLowerCase().includes(q) : x.name.toLowerCase().includes(q)));
+    if(arr.length === 0){
+      list.innerHTML = '<div class="empty">'+(pickerMode==='client'?t('no_clients'):t('no_products'))+'</div>';
+      return;
+    }
+    list.innerHTML = '';
+    arr.forEach(x => {
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.style.cursor = 'pointer';
+      div.innerHTML = pickerMode === 'client'
+        ? '<div class="history-meta"><strong>'+escapeHtml(x.name)+'</strong><span>'+escapeHtml([x.contact,x.email].filter(Boolean).join(' · '))+'</span></div><div>↗</div>'
+        : '<div class="history-meta"><strong>'+escapeHtml(x.name)+'</strong><span>'+curSym()+' '+fmt(x.price||0)+'</span></div><div>↗</div>';
+      div.addEventListener('click', () => {
+        if(pickerMode === 'client'){
+          applyClientToForm(x);
+          toast(t('loaded'));
+        } else {
+          state.items.push({ desc: x.name, qty: 1, price: x.price || 0 });
+          renderItems();
+        }
+        closePicker();
+      });
+      list.appendChild(div);
+    });
+  }
+
+  // --- Edit modal (client / product) ---
+  let editMode = null, editItem = null;
+  function openClientEditor(c){
+    editMode = 'client'; editItem = c || { id: null };
+    $('edit-title').textContent = t('edit_client');
+    const it = editItem;
+    $('edit-body').innerHTML =
+      '<div class="field" style="margin-bottom:10px"><label>'+t('client_name')+'</label><input id="ed-name" value="'+escapeHtml(it.name||'')+'"></div>'+
+      '<div class="field" style="margin-bottom:10px"><label>'+t('contact_person_to')+'</label><input id="ed-contact" value="'+escapeHtml(it.contact||'')+'"></div>'+
+      '<div class="field" style="margin-bottom:10px"><label>'+t('address')+'</label><input id="ed-address" value="'+escapeHtml(it.address||'')+'"></div>'+
+      '<div class="grid-2" style="gap:10px; margin-bottom:10px">'+
+        '<div class="field"><label>'+t('phone')+'</label><input id="ed-phone" value="'+escapeHtml(it.phone||'')+'"></div>'+
+        '<div class="field"><label>'+t('email')+'</label><input id="ed-email" type="email" value="'+escapeHtml(it.email||'')+'"></div>'+
+      '</div>'+
+      '<div class="field"><label>'+t('tax_id')+'</label><input id="ed-tax" value="'+escapeHtml(it.taxId||'')+'"></div>';
+    $('edit-modal').style.display = 'flex';
+    setTimeout(() => $('ed-name').focus(), 50);
+  }
+  function openProductEditor(p){
+    editMode = 'product'; editItem = p || { id: null };
+    $('edit-title').textContent = t('edit_product');
+    const it = editItem;
+    $('edit-body').innerHTML =
+      '<div class="field" style="margin-bottom:10px"><label>'+t('product_name')+'</label><input id="ed-name" value="'+escapeHtml(it.name||'')+'"></div>'+
+      '<div class="field"><label>'+t('product_price')+'</label><input id="ed-price" type="number" inputmode="decimal" step="0.01" value="'+(it.price||0)+'"></div>';
+    $('edit-modal').style.display = 'flex';
+    setTimeout(() => $('ed-name').focus(), 50);
+  }
+  function closeEditor(){ $('edit-modal').style.display = 'none'; }
+  function saveEditor(){
+    if(editMode === 'client'){
+      const c = {
+        id: editItem.id || uid(),
+        name: $('ed-name').value.trim(),
+        contact: $('ed-contact').value.trim(),
+        address: $('ed-address').value.trim(),
+        phone: $('ed-phone').value.trim(),
+        email: $('ed-email').value.trim(),
+        taxId: $('ed-tax').value.trim()
+      };
+      if(!c.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      const arr = loadClients();
+      const i = arr.findIndex(x => x.id === c.id);
+      if(i >= 0) arr[i] = c; else arr.push(c);
+      saveClients(arr);
+      renderClientsList();
+      toast(t('saved_client'));
+    } else if(editMode === 'product'){
+      const p = {
+        id: editItem.id || uid(),
+        name: $('ed-name').value.trim(),
+        price: parseFloat($('ed-price').value) || 0
+      };
+      if(!p.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      const arr = loadProducts();
+      const i = arr.findIndex(x => x.id === p.id);
+      if(i >= 0) arr[i] = p; else arr.push(p);
+      saveProducts(arr);
+      renderProductsList();
+      toast(t('saved_product'));
+    }
+    closeEditor();
+  }
+
+  // --- Export / Import ---
+  function exportAllData(){
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      quotes: loadQuotes(),
+      clients: loadClients(),
+      products: loadProducts(),
+      logo: loadLogo() || null
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ecoco-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  function importData(file){
+    if(file.size > 10 * 1024 * 1024){
+      alert(state.lang === 'en' ? 'File too large' : '檔案過大');
+      return;
+    }
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const d = JSON.parse(e.target.result);
+        // Validate structure
+        if(typeof d !== 'object' || d === null) throw new Error('not an object');
+        const valid = (Array.isArray(d.quotes) || d.quotes === undefined) &&
+                      (Array.isArray(d.clients) || d.clients === undefined) &&
+                      (Array.isArray(d.products) || d.products === undefined);
+        if(!valid) throw new Error('invalid schema');
+        if(!confirm(t('confirm_import'))) return;
+        if(Array.isArray(d.quotes)) saveQuotes(d.quotes);
+        if(Array.isArray(d.clients)) saveClients(d.clients);
+        if(Array.isArray(d.products)) saveProducts(d.products);
+        if(typeof d.logo === 'string' && d.logo.startsWith('data:image/')) {
+          saveLogo(d.logo); showLogo(d.logo);
+        }
+        renderHistory(); renderClientsList(); renderProductsList();
+        toast(t('import_success'));
+      } catch(err){
+        alert(t('import_fail'));
+      }
+    };
+    r.onerror = () => alert(t('import_fail'));
+    r.readAsText(file);
+  }
+
+  // --- Duplicate quote ---
+  function duplicateQuote(){
+    const items = JSON.parse(JSON.stringify(state.items));
+    const to = getClientFromForm();
+    const notes = $('notes').value;
+    const taxRate = $('tax-rate').value;
+    const discType = $('disc-type').value;
+    const discVal = $('disc-val').value;
+    const currency = $('currency').value;
+    newQuote();
+    state.items = items;
+    applyClientToForm(to);
+    $('notes').value = notes;
+    $('tax-rate').value = taxRate;
+    $('disc-type').value = discType;
+    $('disc-val').value = discVal;
+    $('currency').value = currency;
+    renderItems();
+    // Visual feedback: scroll to top and flash the new quote number
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const qn = $('quote-no');
+    qn.style.transition = 'background-color 0.4s';
+    qn.style.backgroundColor = 'var(--accent-soft)';
+    setTimeout(() => { qn.style.backgroundColor = ''; }, 1200);
+    const newNo = qn.value;
+    const msg = state.lang === 'en'
+      ? '✓ Duplicated as new quote: ' + newNo
+      : '✓ 已複製為新報價單：' + newNo;
+    toast(msg, 'success');
+  }
+
+
+  document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+  $('add-row').addEventListener('click', () => { state.items.push({desc:'',qty:1,price:0}); renderItems(); });
+  ['disc-type','disc-val','tax-rate','currency'].forEach(id => $(id).addEventListener('input', recalc));
+  $('currency').addEventListener('change', recalc);
+  $('btn-save').addEventListener('click', () => {
+    const s = snapshot();
+    const arr = loadQuotes();
+    const i = arr.findIndex(x => x.id === s.id);
+    const isUpdate = i >= 0;
+    if(isUpdate) arr[i] = s; else arr.push(s);
+    const ok = saveQuotes(arr);
+    // Auto-save client to address book
+    const c = getClientFromForm();
+    if(c.name){
+      const cArr = loadClients();
+      const idx = cArr.findIndex(x => x.name === c.name);
+      c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
+      if(idx >= 0) cArr[idx] = c; else cArr.push(c);
+      saveClients(cArr);
+    }
+    if(ok !== false){
+      const msg = state.lang === 'en'
+        ? (isUpdate ? '✓ Quote updated' : '✓ Saved to history')
+        : (isUpdate ? '✓ 已更新報價單' : '✓ 已儲存至歷史');
+      toast(msg, 'success');
+    }
+  });
+  $('btn-new').addEventListener('click', newQuote);
+  $('btn-duplicate').addEventListener('click', duplicateQuote);
+  $('btn-print').addEventListener('click', () => window.print());
+  $('btn-pdf').addEventListener('click', exportPDF);
+  $('btn-send').addEventListener('click', openEmailModal);
+
+  // Client/Product wiring
+  $('pick-client').addEventListener('click', () => openPicker('client'));
+  $('save-client').addEventListener('click', saveCurrentClient);
+  $('pick-product').addEventListener('click', () => openPicker('product'));
+  $('btn-add-client').addEventListener('click', () => openClientEditor(null));
+  $('btn-add-product').addEventListener('click', () => openProductEditor(null));
+  $('client-search').addEventListener('input', renderClientsList);
+  $('product-search').addEventListener('input', renderProductsList);
+  $('history-search').addEventListener('input', renderHistory);
+  $('picker-search').addEventListener('input', renderPicker);
+  $('picker-close').addEventListener('click', closePicker);
+  $('picker-modal').addEventListener('click', e => { if(e.target.id === 'picker-modal') closePicker(); });
+  $('edit-close').addEventListener('click', closeEditor);
+  $('edit-cancel').addEventListener('click', closeEditor);
+  $('edit-save').addEventListener('click', saveEditor);
+  $('edit-modal').addEventListener('click', e => { if(e.target.id === 'edit-modal') closeEditor(); });
+
+  // Export / Import
+  $('btn-export').addEventListener('click', exportAllData);
+  $('btn-import').addEventListener('click', () => $('import-file').click());
+  $('import-file').addEventListener('change', e => {
+    if(e.target.files[0]) importData(e.target.files[0]);
+    e.target.value = '';
+  });
+  $('lang').addEventListener('change', e => {
+    state.lang = e.target.value;
+    safeSet(LANG_KEY, state.lang);
+    applyI18n(); renderItems();
+  });
+
+  // --- Email Modal ---
+  function fillTemplate(tpl, data){
+    return String(tpl||'').replace(/\{\{(\w+)\}\}/g, (m, k) => data[k] != null ? data[k] : '');
+  }
+
+  function buildMailContext(){
+    const calc = recalc();
+    const sym = curSym();
+    return {
+      quoteNo: $('quote-no').value || '',
+      client: $('to-name').value || (state.lang==='en' ? 'Sir/Madam' : '貴公司'),
+      contact: $('to-contact').value || (state.lang==='en' ? 'Sir/Madam' : '您'),
+      date: $('quote-date').value || '',
+      validUntil: $('valid-until').value || '',
+      total: sym + ' ' + fmt(calc.total),
+      from: $('from-name').value || '',
+      issuer: $('from-contact').value || '',
+      phone: $('from-phone').value || '',
+      email: $('from-email').value || ''
+    };
+  }
+
+  function openEmailModal(){
+    const ctx = buildMailContext();
+    const clientEmail = $('to-email').value.trim();
+
+    $('mail-to').value = clientEmail;
+    $('mail-cc').value = '';
+    $('mail-bcc').value = '';
+    $('mail-subject').value = fillTemplate(t('mail_subject_tpl'), ctx);
+    $('mail-body').value = fillTemplate(t('mail_body_tpl'), ctx);
+    $('attach-filename').textContent = ($('quote-no').value || 'quotation') + '.pdf';
+
+    // Show warning if client email empty
+    $('email-warn').style.display = clientEmail ? 'none' : 'block';
+
+    // Reset to step 1
+    showStep(1);
+    $('email-modal').style.display = 'flex';
+  }
+
+  function closeEmailModal(){
+    $('email-modal').style.display = 'none';
+  }
+
+  function showStep(n){
+    $('step-1').classList.toggle('active', n === 1);
+    $('step-1').classList.toggle('done', n > 1);
+    $('step-2').classList.toggle('active', n === 2);
+    $('step-1-panel').style.display = n === 1 ? '' : 'none';
+    $('step-2-panel').style.display = n === 2 ? '' : 'none';
+    $('modal-back').style.display = n === 2 ? '' : 'none';
+    $('modal-next').style.display = n === 1 ? '' : 'none';
+    $('modal-send').style.display = n === 2 ? '' : 'none';
+    $('modal-cancel').style.display = n === 1 ? '' : 'none';
+  }
+
+  function renderConfirmSummary(){
+    const to = $('mail-to').value.trim();
+    const cc = $('mail-cc').value.trim();
+    const subj = $('mail-subject').value.trim();
+    const ctx = buildMailContext();
+    const filename = ($('quote-no').value || 'quotation') + '.pdf';
+    const rows = [
+      [t('conf_to'), escapeHtml(to) + (cc ? '<br><span style="color:var(--text-3); font-weight:400; font-size:11px">CC: '+escapeHtml(cc)+'</span>' : '')],
+      [t('conf_subject'), escapeHtml(subj)],
+      [t('conf_quote'), escapeHtml(ctx.quoteNo)],
+      [t('conf_attach'), '📎 ' + escapeHtml(filename)]
+    ];
+    let html = '';
+    rows.forEach(r => {
+      html += '<div class="row"><div class="k">'+r[0]+'</div><div class="v">'+r[1]+'</div></div>';
+    });
+    html += '<div class="row total"><div class="k">'+t('conf_total')+'</div><div class="v">'+escapeHtml(ctx.total)+'</div></div>';
+    $('confirm-summary').innerHTML = html;
+  }
+
+  function isValidEmail(s){
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s||'').trim());
+  }
+
+  $('modal-close').addEventListener('click', closeEmailModal);
+  $('modal-cancel').addEventListener('click', closeEmailModal);
+  $('email-modal').addEventListener('click', e => {
+    if(e.target.id === 'email-modal') closeEmailModal();
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && $('email-modal').style.display !== 'none') closeEmailModal();
+  });
+
+  $('modal-next').addEventListener('click', () => {
+    const to = $('mail-to').value.trim();
+    if(!to){
+      $('email-warn').style.display = 'block';
+      $('mail-to').focus();
+      return;
+    }
+    if(!isValidEmail(to)){
+      alert(state.lang === 'en' ? 'Invalid recipient email' : '收件人 Email 格式不正確');
+      $('mail-to').focus();
+      return;
+    }
+    const cc = $('mail-cc').value.trim();
+    const bcc = $('mail-bcc').value.trim();
+    if(cc && !isValidEmail(cc)){ alert(state.lang === 'en' ? 'Invalid CC email' : 'CC Email 格式不正確'); return; }
+    if(bcc && !isValidEmail(bcc)){ alert(state.lang === 'en' ? 'Invalid BCC email' : 'BCC Email 格式不正確'); return; }
+    if(!$('mail-subject').value.trim()){
+      alert(state.lang === 'en' ? 'Subject is required' : '主旨不能為空');
+      return;
+    }
+    renderConfirmSummary();
+    showStep(2);
+  });
+
+  $('modal-back').addEventListener('click', () => showStep(1));
+
+  $('modal-send').addEventListener('click', async () => {
+    const sendBtn = $('modal-send');
+    const original = sendBtn.innerHTML;
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '⏳ ' + t('generating_pdf');
+    try {
+      // 1. Generate and download PDF
+      await exportPDF();
+      // 2. Open mailto with delay so PDF download dialog shows first
+      setTimeout(() => {
+        const to = $('mail-to').value.trim();
+        const cc = $('mail-cc').value.trim();
+        const bcc = $('mail-bcc').value.trim();
+        const subject = $('mail-subject').value;
+        let body = $('mail-body').value;
+
+        // mailto: URL has practical length limits (Outlook ~2048, browsers vary)
+        // If too long, truncate body and alert user
+        const buildUrl = (b) => {
+          let url = 'mailto:' + encodeURIComponent(to);
+          const params = [];
+          if(cc) params.push('cc=' + encodeURIComponent(cc));
+          if(bcc) params.push('bcc=' + encodeURIComponent(bcc));
+          params.push('subject=' + encodeURIComponent(subject));
+          params.push('body=' + encodeURIComponent(b));
+          return url + '?' + params.join('&');
+        };
+
+        let url = buildUrl(body);
+        if(url.length > 1900){
+          const overflow = url.length - 1900;
+          const cutAt = Math.max(50, body.length - overflow - 50);
+          body = body.slice(0, cutAt) + '\n\n[' + (state.lang==='en' ? 'Content truncated — see attached PDF' : '內文過長已截斷，詳見附件 PDF') + ']';
+          url = buildUrl(body);
+        }
+        window.location.href = url;
+
+        // Auto-save the quote on send
+        const s = snapshot();
+        const arr = loadQuotes();
+        const i = arr.findIndex(x => x.id === s.id);
+        if(i >= 0) arr[i] = s; else arr.push(s);
+        saveQuotes(arr);
+
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = original;
+        closeEmailModal();
+        toast(t('sent_hint'));
+      }, 400);
+    } catch(err){
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = original;
+      alert('Error: ' + err.message);
+    }
+  });
+
+  // ==========================================
+  // AUTH FLOW
+  // ==========================================
+  function showAuthScreen(){
+    $('auth-screen').style.display = 'flex';
+    $('pending-screen').style.display = 'none';
+    document.querySelector('.app').style.display = 'none';
+  }
+  function showPendingScreen(){
+    $('auth-screen').style.display = 'none';
+    $('pending-screen').style.display = 'flex';
+    document.querySelector('.app').style.display = 'none';
+  }
+  function showApp(){
+    $('auth-screen').style.display = 'none';
+    $('pending-screen').style.display = 'none';
+    document.querySelector('.app').style.display = '';
+  }
+
+  function authError(panelId, msg){
+    const el = $(panelId + '-error');
+    el.textContent = msg;
+    el.classList.remove('auth-success');
+  }
+  function authSuccess(panelId, msg){
+    const el = $(panelId + '-error');
+    el.textContent = msg;
+    el.classList.add('auth-success');
+  }
+
+  async function doLogin(){
+    const email = $('login-email').value.trim();
+    const password = $('login-password').value;
+    if(!email || !password){ authError('login', t('err_required')); return; }
+    const btn = $('btn-login');
+    btn.disabled = true; btn.querySelector('span').textContent = '...';
+    try {
+      const { data, error } = await supa.auth.signInWithPassword({ email, password });
+      if(error){ authError('login', t('err_invalid_login')); return; }
+      await afterLogin(data.user);
+    } catch(e){ authError('login', t('err_network')); }
+    finally { btn.disabled = false; btn.querySelector('span').textContent = t('auth_login'); }
+  }
+
+  async function doRegister(){
+    const taxid = $('reg-taxid').value.trim();
+    const company = $('reg-company').value.trim();
+    const name = $('reg-name').value.trim();
+    const email = $('reg-email').value.trim();
+    const password = $('reg-password').value;
+
+    if(!taxid || !company || !name || !email || !password){ authError('register', t('err_required')); return; }
+    if(!/^\d{8}$/.test(taxid)){ authError('register', t('err_invalid_taxid')); return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ authError('register', t('err_invalid_email')); return; }
+    if(password.length < 8){ authError('register', t('err_weak_password')); return; }
+
+    const btn = $('btn-register');
+    btn.disabled = true; btn.querySelector('span').textContent = '...';
+
+    try {
+      // 1. Create auth user
+      const { data: signUp, error: suErr } = await supa.auth.signUp({ email, password });
+      if(suErr){
+        if(/already/i.test(suErr.message)) authError('register', t('err_email_taken'));
+        else authError('register', suErr.message);
+        return;
+      }
+
+      // 2. If email confirmation is off, user is logged in. Otherwise sign in manually.
+      if(!signUp.session){
+        // Try sign in (works if email confirm is off)
+        const { error: siErr } = await supa.auth.signInWithPassword({ email, password });
+        if(siErr){ authError('register', '請至 Email 收信確認後再登入'); return; }
+      }
+
+      // 3. Call registration RPC to attach org
+      const { data: rpc, error: rpcErr } = await supa.rpc('handle_new_user_registration', {
+        p_tax_id: taxid, p_company_name: company, p_display_name: name
+      });
+      if(rpcErr){ authError('register', rpcErr.message); return; }
+
+      // 4. Refresh user context
+      const { data: { user } } = await supa.auth.getUser();
+      await afterLogin(user);
+    } catch(e){
+      console.error(e);
+      authError('register', t('err_network'));
+    } finally {
+      btn.disabled = false; btn.querySelector('span').textContent = t('auth_register');
+    }
+  }
+
+  async function afterLogin(user){
+    currentUser = { id: user.id, email: user.email };
+    // Fetch member record
+    const { data: members, error } = await supa.from('members').select('*').eq('id', user.id);
+    if(error || !members || !members[0]){
+      // Member row missing — probably mid-registration. Show pending screen.
+      showPendingScreen();
+      return;
+    }
+    currentMember = members[0];
+
+    if(!currentMember.approved){
+      showPendingScreen();
+      return;
+    }
+
+    // Fetch organization
+    const { data: orgs } = await supa.from('organizations').select('*').eq('id', currentMember.org_id);
+    currentOrg = orgs && orgs[0] ? orgs[0] : null;
+
+    // Display user info
+    $('user-name').textContent = currentMember.display_name || currentMember.email;
+    $('user-role').textContent = currentMember.role === 'admin' ? t('role_admin') : t('role_member');
+    if(currentOrg && currentOrg.name){
+      const tb = $('topbar-company-name');
+      tb.textContent = currentOrg.name;
+      tb.removeAttribute('data-i18n');
+    }
+    if(currentMember.role === 'admin'){ $('tab-btn-members').style.display = ''; }
+    else { $('tab-btn-members').style.display = 'none'; }
+
+    // Show app
+    showApp();
+
+    // Initial sync
+    await Promise.all([
+      syncQuotesFromCloud(),
+      syncClientsFromCloud(),
+      syncProductsFromCloud()
+    ]);
+
+    // Initialize editor with org data pre-filled
+    newQuote();
+    populateFromOrg();
+    renderItems();
+
+    // Refresh pending count for admins
+    if(currentMember.role === 'admin') refreshPendingCount();
+  }
+
+  async function doLogout(){
+    await supa.auth.signOut();
+    currentUser = null; currentMember = null; currentOrg = null;
+    // Clear inputs
+    $('login-email').value = ''; $('login-password').value = '';
+    $('reg-taxid').value = ''; $('reg-company').value = '';
+    $('reg-name').value = ''; $('reg-email').value = ''; $('reg-password').value = '';
+    authError('login',''); authError('register','');
+    // Reset topbar
+    const tb = $('topbar-company-name');
+    tb.setAttribute('data-i18n', 'brand_title');
+    tb.textContent = t('brand_title');
+    showAuthScreen();
+  }
+
+  // Auto-fill org info into "from" fields
+  function populateFromOrg(){
+    if(!currentOrg) return;
+    if(!$('from-name').value) $('from-name').value = currentOrg.name || '';
+    if(!$('from-address').value) $('from-address').value = currentOrg.address || '';
+    if(!$('from-phone').value) $('from-phone').value = currentOrg.phone || '';
+    if(!$('from-email').value) $('from-email').value = currentOrg.email || '';
+    if(!$('from-tax').value) $('from-tax').value = currentOrg.tax_id || '';
+    if(currentMember && !$('from-contact').value) $('from-contact').value = currentMember.display_name || '';
+  }
+
+  // ==========================================
+  // ORG SETTINGS
+  // ==========================================
+  function renderOrgSettings(){
+    if(!currentOrg) return;
+    $('org-tax-id').value = currentOrg.tax_id || '';
+    $('org-name').value = currentOrg.name || '';
+    $('org-address').value = currentOrg.address || '';
+    $('org-phone').value = currentOrg.phone || '';
+    $('org-email').value = currentOrg.email || '';
+  }
+
+  async function saveOrgSettings(){
+    if(!currentOrg) return;
+    if(currentMember.role !== 'admin'){
+      alert(state.lang === 'en' ? 'Only admin can edit org info' : '僅管理員可修改組織資料');
+      return;
+    }
+    setSyncing(true);
+    try {
+      const updates = {
+        name: $('org-name').value.trim(),
+        address: $('org-address').value.trim(),
+        phone: $('org-phone').value.trim(),
+        email: $('org-email').value.trim()
+      };
+      const { error } = await supa.from('organizations').update(updates).eq('id', currentOrg.id);
+      if(error) throw error;
+      Object.assign(currentOrg, updates);
+      toast(t('saved'), 'success');
+      setSyncing(false);
+    } catch(e){ console.error(e); setSyncing(false, true); }
+  }
+
+  // ==========================================
+  // MEMBERS (admin)
+  // ==========================================
+  async function refreshPendingCount(){
+    if(!currentMember || currentMember.role !== 'admin') return;
+    try {
+      const { count } = await supa.from('members').select('*', { count: 'exact', head: true })
+        .eq('org_id', currentMember.org_id).eq('approved', false);
+      const badge = $('pending-badge');
+      if(count && count > 0){ badge.textContent = count; badge.style.display = ''; }
+      else { badge.style.display = 'none'; }
+    } catch(e){ console.error(e); }
+  }
+
+  async function renderMembers(){
+    if(!currentMember || currentMember.role !== 'admin') return;
+    const { data: members } = await supa.from('members').select('*').eq('org_id', currentMember.org_id);
+    const all = members || [];
+    const pending = all.filter(m => !m.approved);
+    const active = all.filter(m => m.approved);
+
+    const pl = $('pending-members-list');
+    if(pending.length === 0){
+      pl.innerHTML = '<div class="empty">'+t('no_pending')+'</div>';
+    } else {
+      pl.innerHTML = pending.map(m =>
+        '<div class="pending-member-item">'+
+          '<div class="pm-info"><strong>'+escapeHtml(m.display_name||'')+'</strong><span>'+escapeHtml(m.email)+'</span></div>'+
+          '<button class="btn primary" data-approve="'+m.id+'">✓ '+t('approve')+'</button>'+
+        '</div>'
+      ).join('');
+      pl.querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', async e => {
+        const mid = e.currentTarget.dataset.approve;
+        e.currentTarget.disabled = true;
+        const { error } = await supa.rpc('approve_member', { p_member_id: mid });
+        if(error){ alert(error.message); e.currentTarget.disabled = false; return; }
+        await renderMembers();
+        await refreshPendingCount();
+      }));
+    }
+
+    const al = $('active-members-list');
+    al.innerHTML = active.map(m =>
+      '<div class="pending-member-item">'+
+        '<div class="pm-info"><strong>'+escapeHtml(m.display_name||'')+'</strong><span>'+escapeHtml(m.email)+'</span></div>'+
+        '<span class="org-badge">'+(m.role === 'admin' ? t('role_admin') : t('role_member'))+'</span>'+
+      '</div>'
+    ).join('') || '<div class="empty">—</div>';
+  }
+
+  // ==========================================
+  // AUTH UI WIRING
+  // ==========================================
+  document.querySelectorAll('[data-auth-tab]').forEach(b => b.addEventListener('click', () => {
+    const which = b.dataset.authTab;
+    document.querySelectorAll('[data-auth-tab]').forEach(x => x.classList.toggle('active', x === b));
+    $('auth-login').style.display = which === 'login' ? '' : 'none';
+    $('auth-register').style.display = which === 'register' ? '' : 'none';
+  }));
+  $('btn-login').addEventListener('click', doLogin);
+  $('btn-register').addEventListener('click', doRegister);
+  $('btn-logout').addEventListener('click', doLogout);
+  $('btn-logout-pending').addEventListener('click', doLogout);
+  $('btn-save-org').addEventListener('click', saveOrgSettings);
+
+  // Enter key submits auth forms
+  ['login-email','login-password'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); }));
+  ['reg-taxid','reg-company','reg-name','reg-email','reg-password'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key === 'Enter') doRegister(); }));
+
+  // Patch switchTab to handle new tabs
+  const _switchTab = switchTab;
+  switchTab = function(name){
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    ['editor','history','clients','products','org','members'].forEach(n => {
+      const el = $('tab-'+n);
+      if(el) el.style.display = name === n ? '' : 'none';
+    });
+    if(name === 'history') renderHistory();
+    if(name === 'clients') renderClientsList();
+    if(name === 'products') renderProductsList();
+    if(name === 'org') renderOrgSettings();
+    if(name === 'members') renderMembers();
+  };
+  // Re-bind tab buttons since some are new
+  document.querySelectorAll('[data-tab]').forEach(b => {
+    b.replaceWith(b.cloneNode(true));
+  });
+  document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+  // --- Init ---
+  $('lang').value = state.lang;
+  applyI18n();
+  // Initial Editor state in case logged in
+  newQuote();
+  const lg = loadLogo();
+  if(lg) showLogo(lg);
+
+  // Check session
+  (async () => {
+    const { data: { session } } = await supa.auth.getSession();
+    if(session && session.user){
+      await afterLogin(session.user);
+    } else {
+      showAuthScreen();
+    }
+  })();
+
+  // Patch saveQuotes to also push to cloud
+  const _saveQuotesLocal = saveQuotes;
+  saveQuotes = function(arr){
+    _saveQuotesLocal(arr);
+    // Push the latest to cloud (assume latest update is the last item OR caller pushes manually)
+  };
+
+  // Patch the save button to also push to cloud
+  // (We re-wire btn-save below)
+  // The existing handler already calls saveQuotes; we add cloud push:
+  const _origSaveBtn = $('btn-save');
+  // Already bound; replace by cloning to remove all listeners
+  const newSaveBtn = _origSaveBtn.cloneNode(true);
+  _origSaveBtn.replaceWith(newSaveBtn);
+  newSaveBtn.addEventListener('click', async () => {
+    const s = snapshot();
+    const arr = loadQuotes();
+    const i = arr.findIndex(x => x.id === s.id);
+    const isUpdate = i >= 0;
+    if(isUpdate) arr[i] = s; else arr.push(s);
+    _saveQuotesLocal(arr);
+    // Cloud push
+    await pushQuoteToCloud(s);
+    // Auto-save client
+    const c = getClientFromForm();
+    if(c.name){
+      const cArr = loadClients();
+      const idx = cArr.findIndex(x => x.name === c.name);
+      c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
+      if(idx >= 0) cArr[idx] = c; else cArr.push(c);
+      saveClients(cArr);
+      await pushClientToCloud(c);
+    }
+    const msg = state.lang === 'en'
+      ? (isUpdate ? '✓ Quote updated' : '✓ Saved to cloud')
+      : (isUpdate ? '✓ 已更新報價單' : '✓ 已儲存至雲端');
+    toast(msg, 'success');
+  });
+
+  // Patch saveCurrentClient
+  const _origSaveClientBtn = $('save-client');
+  const newSaveClientBtn = _origSaveClientBtn.cloneNode(true);
+  _origSaveClientBtn.replaceWith(newSaveClientBtn);
+  newSaveClientBtn.addEventListener('click', async () => {
+    const c = getClientFromForm();
+    if(!c.name){ alert(state.lang==='en'?'Client name is required':'請先填寫客戶名稱'); return; }
+    const arr = loadClients();
+    const i = arr.findIndex(x => x.name === c.name);
+    c.id = (i >= 0 && arr[i].id) ? arr[i].id : uid();
+    if(i >= 0) arr[i] = c; else arr.push(c);
+    saveClients(arr);
+    await pushClientToCloud(c);
+    toast(t('saved_client'), 'success');
+  });
+
+  // Patch editor save (saveEditor) for client/product cloud push — wrap function
+  const _origSaveEditor = saveEditor;
+  saveEditor = async function(){
+    if(editMode === 'client'){
+      const c = {
+        id: editItem.id || uid(),
+        name: $('ed-name').value.trim(),
+        contact: $('ed-contact').value.trim(),
+        address: $('ed-address').value.trim(),
+        phone: $('ed-phone').value.trim(),
+        email: $('ed-email').value.trim(),
+        taxId: $('ed-tax').value.trim()
+      };
+      if(!c.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      const arr = loadClients();
+      const i = arr.findIndex(x => x.id === c.id);
+      if(i >= 0) arr[i] = c; else arr.push(c);
+      saveClients(arr);
+      await pushClientToCloud(c);
+      renderClientsList(); toast(t('saved_client'), 'success');
+    } else if(editMode === 'product'){
+      const p = {
+        id: editItem.id || uid(),
+        name: $('ed-name').value.trim(),
+        price: parseFloat($('ed-price').value) || 0
+      };
+      if(!p.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      const arr = loadProducts();
+      const i = arr.findIndex(x => x.id === p.id);
+      if(i >= 0) arr[i] = p; else arr.push(p);
+      saveProducts(arr);
+      await pushProductToCloud(p);
+      renderProductsList(); toast(t('saved_product'), 'success');
+    }
+    closeEditor();
+  };
+
+  // Patch client/product delete to also delete from cloud
+  // We rebind via mutation observer or by overriding the render functions' delete handlers.
+  // Simpler: hook into renderClientsList/renderProductsList by monkey-patching after each render.
+  const _origRenderClientsList = renderClientsList;
+  renderClientsList = function(){
+    _origRenderClientsList();
+    document.querySelectorAll('#clients-list [data-del-c]').forEach(b => {
+      const fresh = b.cloneNode(true);
+      b.replaceWith(fresh);
+      fresh.addEventListener('click', async e => {
+        if(!confirm(t('confirm_delete'))) return;
+        const id = e.currentTarget.dataset.delC;
+        saveClients(loadClients().filter(x => x.id !== id));
+        await deleteClientFromCloud(id);
+        renderClientsList();
+      });
+    });
+  };
+  const _origRenderProductsList = renderProductsList;
+  renderProductsList = function(){
+    _origRenderProductsList();
+    document.querySelectorAll('#products-list [data-del-p]').forEach(b => {
+      const fresh = b.cloneNode(true);
+      b.replaceWith(fresh);
+      fresh.addEventListener('click', async e => {
+        if(!confirm(t('confirm_delete'))) return;
+        const id = e.currentTarget.dataset.delP;
+        saveProducts(loadProducts().filter(x => x.id !== id));
+        await deleteProductFromCloud(id);
+        renderProductsList();
+      });
+    });
+  };
+
+  // Patch renderHistory delete to push delete to cloud
+  const _origRenderHistory = renderHistory;
+  renderHistory = function(){
+    _origRenderHistory();
+    document.querySelectorAll('#history-list [data-del]').forEach(b => {
+      const fresh = b.cloneNode(true);
+      b.replaceWith(fresh);
+      fresh.addEventListener('click', async e => {
+        if(!confirm(t('confirm_delete'))) return;
+        const id = e.currentTarget.dataset.del;
+        saveQuotes(loadQuotes().filter(x => x.id !== id));
+        await deleteQuoteFromCloud(id);
+        renderHistory();
+        toast(t('deleted'));
+      });
+    });
+  };
+})();
+</script>
+</body>
+</html>
