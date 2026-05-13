@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#0f6e56" />
 <title>報價單系統 | Quotation Tool</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1059,7 +1060,7 @@
               </div>
               <div class="field">
                 <label data-i18n="email">Email</label>
-                <input type="email" id="from-email" inputmode="email" autocomplete="email" />
+                <input type="email" id="from-email" inputmode="email" autocomplete="email" list="email-suggest" />
               </div>
             </div>
             <div class="field">
@@ -1095,7 +1096,7 @@
               </div>
               <div class="field">
                 <label data-i18n="email">Email</label>
-                <input type="email" id="to-email" inputmode="email" />
+                <input type="email" id="to-email" inputmode="email" list="email-suggest" />
               </div>
             </div>
             <div class="field">
@@ -1816,6 +1817,9 @@
     }
   });
 
+
+  let lastSyncError = null;
+  let syncErrorTimer = null;
 
   function setSyncing(on, error){
     const el = $('sync-indicator');
@@ -2915,7 +2919,7 @@
     const matches = EMAIL_DOMAINS.filter(d => d.startsWith(after));
     dl.innerHTML = matches.map(d => '<option value="'+local+'@'+d+'">').join('');
   }
-  ['mail-to','mail-cc','mail-bcc'].forEach(id => {
+  ['mail-to','mail-cc','mail-bcc','to-email','from-email'].forEach(id => {
     const el = $(id);
     if(el) el.addEventListener('input', () => updateEmailSuggestions(el));
   });
@@ -3195,7 +3199,8 @@
 
       // 3. Call registration RPC to attach org
       const { data: rpc, error: rpcErr } = await supa.rpc('handle_new_user_registration', {
-        p_tax_id: taxid, p_company_name: company, p_display_name: name
+        p_tax_id: taxid, p_company_name: company, p_display_name: name,
+        p_invited: isInvitedRegistration
       });
       if(rpcErr){ authError('register', rpcErr.message); return; }
 
@@ -3386,12 +3391,37 @@
     }
 
     const al = $('active-members-list');
-    al.innerHTML = active.map(m =>
-      '<div class="pending-member-item">'+
+    al.innerHTML = active.map(m => {
+      const isSelf = m.id === currentUser.id;
+      const canRemove = !isSelf && currentMember.role === 'admin';
+      return '<div class="pending-member-item">'+
         '<div class="pm-info"><strong>'+escapeHtml(m.display_name||'')+'</strong><span>'+escapeHtml(m.email)+'</span></div>'+
-        '<span class="org-badge">'+(m.role === 'admin' ? t('role_admin') : t('role_member'))+'</span>'+
-      '</div>'
-    ).join('') || '<div class="empty">—</div>';
+        '<div style="display:flex; align-items:center; gap:8px">'+
+          '<span class="org-badge">'+(m.role === 'admin' ? t('role_admin') : t('role_member'))+'</span>'+
+          (canRemove ? '<button class="btn" data-remove-m="'+m.id+'" style="color:var(--danger); padding:4px 10px" title="'+t('remove_member')+'">🗑</button>' : '')+
+        '</div>'+
+      '</div>';
+    }).join('') || '<div class="empty">—</div>';
+
+    al.querySelectorAll('[data-remove-m]').forEach(b => b.addEventListener('click', async e => {
+      const mid = e.currentTarget.dataset.removeM;
+      const target = active.find(x => x.id === mid);
+      if(!target) return;
+      const confirmMsg = (state.lang === 'en'
+        ? 'Remove ' + (target.display_name || target.email) + ' from this organization?'
+        : '確定將 ' + (target.display_name || target.email) + ' 從本組織移除？');
+      if(!confirm(confirmMsg)) return;
+      e.currentTarget.disabled = true;
+      try {
+        const { error } = await supa.from('members').delete().eq('id', mid);
+        if(error) throw error;
+        toast(state.lang === 'en' ? '✓ Member removed' : '✓ 已移除成員', 'success');
+        await renderMembers();
+      } catch(err){
+        alert((state.lang === 'en' ? 'Failed: ' : '失敗：') + err.message);
+        e.currentTarget.disabled = false;
+      }
+    }));
   }
 
   // ==========================================
@@ -3404,7 +3434,9 @@
   function generateInviteLink(){
     if(!currentOrg) return '';
     const url = new URL(window.location.href);
-    url.hash = 'invite=' + encodeURIComponent(currentOrg.tax_id) + '&org=' + encodeURIComponent(currentOrg.name);
+    url.hash = 'invite=' + encodeURIComponent(currentOrg.tax_id)
+      + '&org=' + encodeURIComponent(currentOrg.name)
+      + '&inv=1';  // signal: came from an invite link
     return url.toString();
   }
 
@@ -3487,14 +3519,16 @@
   }
 
   // Detect invite hash on register screen
+  let isInvitedRegistration = false;
   function applyInviteFromHash(){
     const hash = window.location.hash.replace(/^#/, '');
     if(!hash) return;
     const params = new URLSearchParams(hash);
     const taxId = params.get('invite');
     const orgName = params.get('org');
+    const isInv = params.get('inv') === '1';
     if(taxId){
-      // Switch to register tab and pre-fill
+      isInvitedRegistration = isInv;
       const regBtn = document.querySelector('[data-auth-tab="register"]');
       if(regBtn) regBtn.click();
       const taxInput = $('reg-taxid');
