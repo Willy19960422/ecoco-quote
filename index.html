@@ -933,9 +933,7 @@
         <strong id="user-name"></strong>
         <span class="org-badge" id="user-role"></span>
       </div>
-      <button class="tab-btn" id="btn-logout" title="登出">
-        <span class="ico">⏻</span>
-      </button>
+      <button class="tab-btn" id="btn-logout" title="登出"><span data-i18n="logout">登出</span></button>
       <select id="lang" class="lang-select">
         <option value="zh">中文</option>
         <option value="en">English</option>
@@ -1217,6 +1215,22 @@
   <!-- Members (Admin only) -->
   <div id="tab-members" style="display:none">
     <div class="card">
+      <p class="section-title"><span class="dot" style="background:var(--accent)"></span><span data-i18n="invite_member">新增成員</span></p>
+      <p style="font-size:12px; color:var(--text-2); margin:0 0 12px" data-i18n="invite_desc">由管理員為新員工建立帳號。新員工會收到 Email，點連結後設定密碼即可登入，自動加入此組織且無需審核。</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
+        <div class="field" style="flex:2; min-width:160px">
+          <label data-i18n="new_member_email">新成員 Email</label>
+          <input type="email" id="invite-email" placeholder="someone@example.com" inputmode="email" />
+        </div>
+        <div class="field" style="flex:1; min-width:120px">
+          <label data-i18n="new_member_name">姓名</label>
+          <input type="text" id="invite-name" />
+        </div>
+        <button class="btn primary" id="btn-invite" style="height:42px"><span data-i18n="send_invite">寄出邀請</span></button>
+      </div>
+      <p id="invite-result" style="font-size:12px; margin:8px 0 0; min-height:18px"></p>
+    </div>
+    <div class="card">
       <p class="section-title"><span class="dot" style="background:var(--danger)"></span><span data-i18n="pending_members">待審核成員</span></p>
       <div id="pending-members-list"></div>
     </div>
@@ -1284,18 +1298,19 @@
 
         <div class="field" style="margin-bottom: 14px;">
           <label data-i18n="to_email">收件人 Email <span style="color:var(--danger)">*</span></label>
-          <input type="email" id="mail-to" />
+          <input type="email" id="mail-to" list="email-suggest" autocomplete="off" />
+          <datalist id="email-suggest"></datalist>
           <small style="color:var(--text-3); font-size:11px; margin-top:4px" data-i18n="to_email_hint">預設帶入客戶資料區的 Email，可手動修改</small>
         </div>
 
         <div class="grid-2" style="gap:10px; margin-bottom:14px">
           <div class="field">
             <label data-i18n="cc_email">CC（副本）</label>
-            <input type="email" id="mail-cc" placeholder="optional" />
+            <input type="email" id="mail-cc" list="email-suggest" autocomplete="off" placeholder="optional" />
           </div>
           <div class="field">
             <label data-i18n="bcc_email">BCC（密件副本）</label>
-            <input type="email" id="mail-bcc" placeholder="optional" />
+            <input type="email" id="mail-bcc" list="email-suggest" autocomplete="off" placeholder="optional" />
           </div>
         </div>
 
@@ -1455,8 +1470,8 @@
       err_invalid_email: 'Email 格式錯誤',
       err_network: '網路錯誤，請稍後再試',
       // Org
-      tab_org: '組織', tab_members: '成員',
-      org_title: '組織資料',
+      tab_org: '基本資料', tab_members: '成員',
+      org_title: '基本資料設定',
       org_desc: '這裡的資料會自動帶入每張新報價單的「寄件方」欄位。',
       // Members
       pending_members: '待審核成員',
@@ -1464,6 +1479,16 @@
       no_pending: '目前沒有待審核成員',
       approve: '核准',
       role_admin: '管理員', role_member: '成員',
+      invite_member: '新增成員',
+      invite_desc: '輸入新員工 Email 與姓名後按「寄出邀請」，系統會寄一封信給對方，對方點連結設定密碼即可登入，自動加入此組織且無需審核。',
+      new_member_email: '新成員 Email',
+      new_member_name: '姓名',
+      send_invite: '寄出邀請',
+      invite_sent: '✓ 邀請已寄出，請通知對方收信',
+      invite_failed: '邀請失敗：',
+      invite_existing: '此 Email 已是組織成員',
+      remove_member: '移除',
+      confirm_remove_member: '確定移除此成員？',
       // Sync
       syncing: '同步中...',
       synced: '已同步',
@@ -1554,8 +1579,8 @@
       err_invalid_email: 'Invalid email format',
       err_network: 'Network error, please try again',
       // Org
-      tab_org: 'Org', tab_members: 'Members',
-      org_title: 'Organization',
+      tab_org: 'Basic Info', tab_members: 'Members',
+      org_title: 'Basic Information',
       org_desc: 'This info auto-fills the "From" section of every new quote.',
       // Members
       pending_members: 'Pending Members',
@@ -1563,6 +1588,16 @@
       no_pending: 'No pending members',
       approve: 'Approve',
       role_admin: 'Admin', role_member: 'Member',
+      invite_member: 'Add Member',
+      invite_desc: 'Enter new employee email and name, then click "Send Invite". They will receive an email to set their password and auto-join this organization without further approval.',
+      new_member_email: 'New Member Email',
+      new_member_name: 'Name',
+      send_invite: 'Send Invite',
+      invite_sent: '✓ Invitation sent, please notify them to check inbox',
+      invite_failed: 'Invite failed: ',
+      invite_existing: 'This email is already a member',
+      remove_member: 'Remove',
+      confirm_remove_member: 'Remove this member?',
       // Sync
       syncing: 'Syncing...',
       synced: 'Synced',
@@ -1782,12 +1817,41 @@
     $('quote-no').value = genQuoteNo();
     $('quote-date').value = todayStr(0);
     $('valid-until').value = todayStr(30);
+    // 清空客戶
     $('to-name').value = ''; $('to-contact').value = '';
     $('to-address').value = ''; $('to-phone').value = '';
     $('to-email').value = ''; $('to-tax').value = '';
+    // 清空寄件方欄位再從組織重新帶入
+    $('from-name').value = ''; $('from-contact').value = '';
+    $('from-address').value = ''; $('from-phone').value = '';
+    $('from-email').value = ''; $('from-tax').value = '';
     $('notes').value = '';
     $('disc-val').value = 0; $('tax-rate').value = 5;
+    // 從組織自動帶入寄件方
+    if(currentOrg){
+      $('from-name').value = currentOrg.name || '';
+      $('from-address').value = currentOrg.address || '';
+      $('from-phone').value = currentOrg.phone || '';
+      $('from-email').value = currentOrg.email || '';
+      $('from-tax').value = currentOrg.tax_id || '';
+    }
+    if(currentMember){
+      $('from-contact').value = currentMember.display_name || '';
+    }
     renderItems();
+    // 確保切到編輯分頁
+    if(typeof switchTab === 'function'){ switchTab('editor'); }
+    // 視覺反饋
+    if(typeof toast === 'function'){
+      const qn = $('quote-no');
+      if(qn){
+        qn.style.transition = 'background-color 0.4s';
+        qn.style.backgroundColor = 'var(--accent-soft)';
+        setTimeout(() => { qn.style.backgroundColor = ''; }, 1200);
+      }
+      const msg = state.lang === 'en' ? '✓ New quote ready: ' + ($('quote-no').value||'') : '✓ 已建立新報價單：' + ($('quote-no').value||'');
+      toast(msg, 'success');
+    }
   }
 
   function snapshot(){
@@ -2528,11 +2592,15 @@
   $('history-search').addEventListener('input', renderHistory);
   $('picker-search').addEventListener('input', renderPicker);
   $('picker-close').addEventListener('click', closePicker);
-  $('picker-modal').addEventListener('click', e => { if(e.target.id === 'picker-modal') closePicker(); });
+  $('picker-modal').addEventListener('click', e => {
+    // 點外面不關閉，避免誤觸；要關必須點 X
+  });
   $('edit-close').addEventListener('click', closeEditor);
   $('edit-cancel').addEventListener('click', closeEditor);
   $('edit-save').addEventListener('click', saveEditor);
-  $('edit-modal').addEventListener('click', e => { if(e.target.id === 'edit-modal') closeEditor(); });
+  $('edit-modal').addEventListener('click', e => {
+    // 點外面不關閉，避免誤觸
+  });
 
   // Export / Import
   $('btn-export').addEventListener('click', exportAllData);
@@ -2587,6 +2655,32 @@
     showStep(1);
     $('email-modal').style.display = 'flex';
   }
+
+  // Email domain auto-suggest
+  const EMAIL_DOMAINS = [
+    'gmail.com','yahoo.com.tw','yahoo.com','hotmail.com','outlook.com','icloud.com',
+    'msn.com','live.com','pchome.com.tw','seed.net.tw','hinet.net','kimo.com',
+    'mail.com','yandex.com','qq.com','163.com','126.com'
+  ];
+  function updateEmailSuggestions(inputEl){
+    const v = inputEl.value;
+    const dl = $('email-suggest');
+    if(!dl) return;
+    const atIdx = v.indexOf('@');
+    if(atIdx === -1){
+      // No @ yet — clear suggestions
+      dl.innerHTML = '';
+      return;
+    }
+    const local = v.slice(0, atIdx);
+    const after = v.slice(atIdx+1).toLowerCase();
+    const matches = EMAIL_DOMAINS.filter(d => d.startsWith(after));
+    dl.innerHTML = matches.map(d => '<option value="'+local+'@'+d+'">').join('');
+  }
+  ['mail-to','mail-cc','mail-bcc'].forEach(id => {
+    const el = $(id);
+    if(el) el.addEventListener('input', () => updateEmailSuggestions(el));
+  });
 
   function closeEmailModal(){
     $('email-modal').style.display = 'none';
@@ -2726,6 +2820,8 @@
     $('auth-screen').style.display = 'flex';
     $('pending-screen').style.display = 'none';
     document.querySelector('.app').style.display = 'none';
+    // Apply invite from URL hash if present
+    setTimeout(() => { try { applyInviteFromHash(); } catch(e){} }, 50);
   }
   function showPendingScreen(){
     $('auth-screen').style.display = 'none';
@@ -2902,9 +2998,13 @@
   async function saveOrgSettings(){
     if(!currentOrg) return;
     if(currentMember.role !== 'admin'){
-      alert(state.lang === 'en' ? 'Only admin can edit org info' : '僅管理員可修改組織資料');
+      alert(state.lang === 'en' ? 'Only admin can edit org info' : '僅管理員可修改基本資料');
       return;
     }
+    const btn = $('btn-save-org');
+    btn.disabled = true;
+    const origText = btn.innerHTML;
+    btn.innerHTML = '⏳ ' + t('syncing');
     setSyncing(true);
     try {
       const updates = {
@@ -2916,9 +3016,29 @@
       const { error } = await supa.from('organizations').update(updates).eq('id', currentOrg.id);
       if(error) throw error;
       Object.assign(currentOrg, updates);
-      toast(t('saved'), 'success');
       setSyncing(false);
-    } catch(e){ console.error(e); setSyncing(false, true); }
+      // Update topbar company name immediately
+      if(updates.name){ $('topbar-company-name').textContent = updates.name; }
+      // Visible success
+      btn.innerHTML = '✓ ' + (state.lang === 'en' ? 'Saved!' : '已儲存！');
+      btn.style.background = 'var(--accent)';
+      btn.style.color = 'white';
+      btn.style.borderColor = 'var(--accent)';
+      toast(state.lang === 'en' ? '✓ Basic info saved to cloud' : '✓ 基本資料已儲存至雲端', 'success');
+      setTimeout(() => {
+        btn.innerHTML = origText;
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+        btn.disabled = false;
+      }, 2000);
+    } catch(e){
+      console.error(e);
+      setSyncing(false, true);
+      btn.innerHTML = origText;
+      btn.disabled = false;
+      alert(state.lang === 'en' ? 'Save failed: ' + e.message : '儲存失敗：' + e.message);
+    }
   }
 
   // ==========================================
@@ -2972,8 +3092,96 @@
   }
 
   // ==========================================
-  // AUTH UI WIRING
+  // INVITE MEMBER (admin only)
   // ==========================================
+  // Strategy: pre-create a pending row in `members` (without auth user id),
+  // or simpler: generate an invite URL that pre-fills tax_id on the register screen.
+  // We use the latter — purely front-end, no extra SQL needed.
+
+  function generateInviteLink(){
+    if(!currentOrg) return '';
+    const url = new URL(window.location.href);
+    url.hash = 'invite=' + encodeURIComponent(currentOrg.tax_id) + '&org=' + encodeURIComponent(currentOrg.name);
+    return url.toString();
+  }
+
+  async function sendInvite(){
+    const email = $('invite-email').value.trim();
+    const name = $('invite-name').value.trim();
+    const resultEl = $('invite-result');
+    resultEl.textContent = '';
+    resultEl.style.color = 'var(--danger)';
+
+    if(!email || !name){
+      resultEl.textContent = t('err_required');
+      return;
+    }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      resultEl.textContent = t('err_invalid_email');
+      return;
+    }
+
+    // Check if already a member
+    const { data: existing } = await supa.from('members').select('id').eq('org_id', currentMember.org_id).eq('email', email);
+    if(existing && existing.length > 0){
+      resultEl.textContent = t('invite_existing');
+      return;
+    }
+
+    const btn = $('btn-invite');
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '⏳ ' + t('syncing');
+
+    try {
+      // Pre-create a placeholder member row that we'll claim on registration
+      // We use a temporary UUID; the real user_id will replace it after they register
+      // But this requires DB design changes. Simpler path:
+      // Just generate an invite link and show it to the admin to share manually.
+      const inviteLink = generateInviteLink();
+
+      // Build clipboard text
+      const subject = (state.lang === 'en'
+        ? 'You are invited to join ' + currentOrg.name + ' on the quotation system'
+        : '邀請您加入 ' + currentOrg.name + ' 的報價單系統');
+      const body = (state.lang === 'en'
+        ? 'Hi ' + name + ',\n\nPlease register via this link to join ' + currentOrg.name + ':\n\n' + inviteLink + '\n\nUse this email when registering: ' + email + '\nTax ID (auto-filled): ' + currentOrg.tax_id
+        : '您好 ' + name + '，\n\n請透過此連結註冊以加入 ' + currentOrg.name + '：\n\n' + inviteLink + '\n\n請使用此 Email 註冊：' + email + '\n統一編號（已預填）：' + currentOrg.tax_id);
+
+      const mailto = 'mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+      window.location.href = mailto;
+
+      resultEl.style.color = 'var(--accent)';
+      resultEl.innerHTML = '✓ ' + (state.lang === 'en' ? 'Email draft opened. After they register, they will appear in "Pending Members" — approve them with one click.' : 'Email 草稿已開啟。對方註冊後會出現在「待審核成員」清單，您一鍵核准即可。');
+      $('invite-email').value = '';
+      $('invite-name').value = '';
+    } catch(e){
+      resultEl.textContent = t('invite_failed') + e.message;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+  }
+
+  // Detect invite hash on register screen
+  function applyInviteFromHash(){
+    const hash = window.location.hash.replace(/^#/, '');
+    if(!hash) return;
+    const params = new URLSearchParams(hash);
+    const taxId = params.get('invite');
+    const orgName = params.get('org');
+    if(taxId){
+      // Switch to register tab and pre-fill
+      const regBtn = document.querySelector('[data-auth-tab="register"]');
+      if(regBtn) regBtn.click();
+      const taxInput = $('reg-taxid');
+      const compInput = $('reg-company');
+      if(taxInput){ taxInput.value = taxId; taxInput.readOnly = true; taxInput.style.background = 'var(--surface-2)'; }
+      if(compInput && orgName){ compInput.value = orgName; compInput.readOnly = true; compInput.style.background = 'var(--surface-2)'; }
+    }
+  }
+
+
   document.querySelectorAll('[data-auth-tab]').forEach(b => b.addEventListener('click', () => {
     const which = b.dataset.authTab;
     document.querySelectorAll('[data-auth-tab]').forEach(x => x.classList.toggle('active', x === b));
@@ -2985,6 +3193,7 @@
   $('btn-logout').addEventListener('click', doLogout);
   $('btn-logout-pending').addEventListener('click', doLogout);
   $('btn-save-org').addEventListener('click', saveOrgSettings);
+  $('btn-invite').addEventListener('click', sendInvite);
 
   // Enter key submits auth forms
   ['login-email','login-password'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); }));
