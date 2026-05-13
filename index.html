@@ -1622,7 +1622,8 @@
       // Sync
       syncing: '同步中...',
       synced: '已同步',
-      sync_error: '同步失敗'
+      sync_error: '同步失敗（點擊重試）',
+      click_to_retry: '點擊重新同步'
     },
     en: {
       quotation_tool: 'Quotation Tool', tab_editor: 'Editor', tab_history: 'History',
@@ -1751,7 +1752,8 @@
       // Sync
       syncing: 'Syncing...',
       synced: 'Synced',
-      sync_error: 'Sync failed'
+      sync_error: 'Sync failed (click to retry)',
+      click_to_retry: 'Click to retry sync'
     }
   };
 
@@ -1785,13 +1787,71 @@
   // On login, pull from Supabase to refresh cache.
 
   let syncing = 0;
+  // Click sync-indicator to retry full sync (when in error state)
+  document.addEventListener('DOMContentLoaded', () => {
+    const syncEl = document.getElementById('sync-indicator');
+    if(syncEl){
+      syncEl.addEventListener('click', async () => {
+        if(!currentMember) return;
+        if(!syncEl.className.includes('error')) return;
+        if(lastSyncError){
+          console.log('[Sync Error Detail]', lastSyncError);
+        }
+        toast(state.lang === 'en' ? 'Retrying sync...' : '重新同步中...', 'success');
+        try {
+          await Promise.all([
+            syncQuotesFromCloud(),
+            syncClientsFromCloud(),
+            syncProductsFromCloud()
+          ]);
+          toast(state.lang === 'en' ? '✓ Sync successful' : '✓ 同步成功', 'success');
+          if($('tab-history').style.display !== 'none') renderHistory();
+          if($('tab-clients').style.display !== 'none') renderClientsList();
+          if($('tab-products').style.display !== 'none') renderProductsList();
+        } catch(e){
+          console.error('[Retry failed]', e);
+          toast((state.lang === 'en' ? '✗ Retry failed: ' : '✗ 重試仍失敗：') + (e.message || ''), 'error');
+        }
+      });
+    }
+  });
+
+
   function setSyncing(on, error){
     const el = $('sync-indicator');
     if(!el) return;
-    if(error){ el.className = 'sync-indicator error'; el.textContent = t('sync_error'); return; }
+    if(error){
+      lastSyncError = (error && error.message) ? error.message : (typeof error === 'string' ? error : 'Unknown error');
+      el.className = 'sync-indicator error';
+      el.textContent = t('sync_error');
+      el.title = lastSyncError + ' (' + t('click_to_retry') + ')';
+      el.style.cursor = 'pointer';
+      // Auto-clear error display after 5 seconds (so it doesn't stick forever)
+      clearTimeout(syncErrorTimer);
+      syncErrorTimer = setTimeout(() => {
+        if(el.className.includes('error') && syncing === 0){
+          el.className = 'sync-indicator';
+          el.textContent = '';
+          el.title = '';
+          el.style.cursor = '';
+        }
+      }, 5000);
+      return;
+    }
     if(on){ syncing++; } else { syncing = Math.max(0, syncing-1); }
-    if(syncing > 0){ el.className = 'sync-indicator syncing'; el.textContent = t('syncing'); }
-    else { el.className = 'sync-indicator'; el.textContent = ''; }
+    if(syncing > 0){
+      el.className = 'sync-indicator syncing';
+      el.textContent = t('syncing');
+      el.title = '';
+    } else {
+      // Successful end of sync — clear any stale error display
+      el.className = 'sync-indicator';
+      el.textContent = '';
+      el.title = '';
+      el.style.cursor = '';
+      lastSyncError = null;
+      clearTimeout(syncErrorTimer);
+    }
   }
 
   // Quotes
@@ -1832,7 +1892,7 @@
       }));
       saveQuotes(local);
       setSyncing(false);
-    } catch(e){ console.error(e); setSyncing(false, true); }
+    } catch(e){ console.error(e); setSyncing(false, e); }
   }
 
   async function pushQuoteToCloud(snap){
@@ -1858,7 +1918,7 @@
       const { error } = await supa.from('quotes').upsert(row);
       if(error) throw error;
       setSyncing(false);
-    } catch(e){ console.error('quote push failed', e); setSyncing(false, true); }
+    } catch(e){ console.error('quote push failed', e); setSyncing(false, e); }
   }
 
   async function deleteQuoteFromCloud(id){
@@ -2382,7 +2442,7 @@
       }));
       saveClients(local);
       setSyncing(false);
-    } catch(e){ console.error(e); setSyncing(false, true); }
+    } catch(e){ console.error(e); setSyncing(false, e); }
   }
 
   async function pushClientToCloud(c){
@@ -2397,7 +2457,7 @@
       const { error } = await supa.from('clients').upsert(row);
       if(error) throw error;
       setSyncing(false);
-    } catch(e){ console.error('client push failed', e); setSyncing(false, true); }
+    } catch(e){ console.error('client push failed', e); setSyncing(false, e); }
   }
 
   async function deleteClientFromCloud(id){
@@ -2417,7 +2477,7 @@
       }));
       saveProducts(local);
       setSyncing(false);
-    } catch(e){ console.error(e); setSyncing(false, true); }
+    } catch(e){ console.error(e); setSyncing(false, e); }
   }
 
   async function pushProductToCloud(p){
@@ -2431,7 +2491,7 @@
       const { error } = await supa.from('products').upsert(row);
       if(error) throw error;
       setSyncing(false);
-    } catch(e){ console.error('product push failed', e); setSyncing(false, true); }
+    } catch(e){ console.error('product push failed', e); setSyncing(false, e); }
   }
 
   async function deleteProductFromCloud(id){
@@ -3277,7 +3337,7 @@
       }, 2000);
     } catch(e){
       console.error(e);
-      setSyncing(false, true);
+      setSyncing(false, e);
       btn.innerHTML = origText;
       btn.disabled = false;
       alert(state.lang === 'en' ? 'Save failed: ' + e.message : '儲存失敗：' + e.message);
