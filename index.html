@@ -577,9 +577,17 @@
     display: flex; align-items: center; gap: 6px;
     padding: 4px 10px;
     background: var(--surface-2);
+    border: 1px solid transparent;
     border-radius: var(--radius);
     font-size: 12px;
     color: var(--text-2);
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .user-bar:hover {
+    border-color: var(--border-strong);
+    background: var(--bg);
   }
   .user-bar strong { color: var(--text); font-weight: 500; }
   .user-bar .org-badge {
@@ -856,6 +864,25 @@
         <span data-i18n="auth_login">登入</span>
       </button>
       <p class="auth-error" id="login-error"></p>
+      <p style="text-align:center; margin-top:12px; font-size:13px">
+        <a href="#" id="link-forgot" style="color:var(--accent); text-decoration:none" data-i18n="forgot_password">忘記密碼？</a>
+      </p>
+    </div>
+
+    <!-- Forgot Password -->
+    <div id="auth-forgot" class="auth-panel" style="display:none">
+      <p style="font-size:13px; color:var(--text-2); margin:0 0 14px; line-height:1.7" data-i18n="forgot_desc">輸入您的 Email，系統會寄一封重設密碼的連結到信箱。</p>
+      <div class="field" style="margin-bottom:14px">
+        <label data-i18n="email">Email</label>
+        <input type="email" id="forgot-email" autocomplete="email" inputmode="email" />
+      </div>
+      <button class="btn primary auth-submit" id="btn-forgot-send">
+        <span data-i18n="send_reset_link">寄出重設連結</span>
+      </button>
+      <p class="auth-error" id="forgot-error"></p>
+      <p style="text-align:center; margin-top:12px; font-size:13px">
+        <a href="#" id="link-back-login" style="color:var(--text-2); text-decoration:none" data-i18n="back_to_login">← 返回登入</a>
+      </p>
     </div>
 
     <!-- Register -->
@@ -899,6 +926,28 @@
   </div>
 </div>
 
+<!-- RESET PASSWORD SCREEN (from email link) -->
+<div id="reset-screen" class="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <h1 data-i18n="reset_title">重設密碼</h1>
+      <p data-i18n="reset_subtitle" style="color:var(--text-2); font-size:13px; margin:6px 0 0">請輸入新密碼</p>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label data-i18n="new_password">新密碼 (至少 8 碼)</label>
+      <input type="password" id="reset-password" autocomplete="new-password" minlength="8" />
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label data-i18n="confirm_password">確認新密碼</label>
+      <input type="password" id="reset-password-confirm" autocomplete="new-password" minlength="8" />
+    </div>
+    <button class="btn primary auth-submit" id="btn-reset-submit">
+      <span data-i18n="update_password">更新密碼</span>
+    </button>
+    <p class="auth-error" id="reset-error"></p>
+  </div>
+</div>
+
 
 <div class="app">
 
@@ -929,10 +978,10 @@
         <span class="ico">👤</span> <span data-i18n="tab_members">成員</span>
         <span id="pending-badge" style="display:none; background:var(--danger); color:white; padding:1px 6px; border-radius:10px; font-size:10px; margin-left:4px"></span>
       </button>
-      <div class="user-bar" id="user-bar">
+      <button class="user-bar" id="user-bar" title="點選開啟帳號設定">
         <strong id="user-name"></strong>
         <span class="org-badge" id="user-role"></span>
-      </div>
+      </button>
       <button class="tab-btn" id="btn-logout" title="登出"><span data-i18n="logout">登出</span></button>
       <select id="lang" class="lang-select">
         <option value="zh">中文</option>
@@ -1242,7 +1291,53 @@
 
 </div>
 
-<!-- Picker Modal (clients / products) -->
+<!-- My Account Modal -->
+<div class="modal-backdrop" id="account-modal" style="display:none">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h2 data-i18n="my_account">我的帳號</h2>
+      <button class="modal-close" id="account-close" aria-label="close">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- Profile section -->
+      <div style="margin-bottom:18px">
+        <p class="section-title" style="margin-bottom:10px"><span class="dot"></span><span data-i18n="profile">個人資料</span></p>
+        <div class="field" style="margin-bottom:10px">
+          <label data-i18n="email">Email</label>
+          <input type="email" id="acct-email" disabled style="background:var(--surface-2)" />
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label data-i18n="display_name">顯示名稱</label>
+          <input type="text" id="acct-display-name" />
+        </div>
+        <div style="text-align:right">
+          <button class="btn primary" id="btn-save-profile">💾 <span data-i18n="save_profile">儲存個人資料</span></button>
+        </div>
+      </div>
+
+      <hr style="border:none; border-top:1px solid var(--border); margin:20px 0">
+
+      <!-- Change password section -->
+      <div>
+        <p class="section-title" style="margin-bottom:10px"><span class="dot" style="background:var(--accent)"></span><span data-i18n="change_password">修改密碼</span></p>
+        <div class="field" style="margin-bottom:10px">
+          <label data-i18n="new_password">新密碼 (至少 8 碼)</label>
+          <input type="password" id="acct-new-password" autocomplete="new-password" minlength="8" />
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label data-i18n="confirm_password">確認新密碼</label>
+          <input type="password" id="acct-new-password-confirm" autocomplete="new-password" minlength="8" />
+        </div>
+        <div style="text-align:right">
+          <button class="btn primary" id="btn-change-password">🔒 <span data-i18n="update_password">更新密碼</span></button>
+        </div>
+        <p id="acct-result" style="font-size:12px; margin:10px 0 0; text-align:center; min-height:18px"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <div class="modal-backdrop" id="picker-modal" style="display:none">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
@@ -1455,6 +1550,26 @@
       auth_subtitle: '線上報價單管理工具',
       brand_title: '報價單系統',
       auth_login: '登入', auth_register: '註冊',
+      forgot_password: '忘記密碼？',
+      forgot_desc: '輸入您的 Email，系統會寄一封重設密碼的連結到信箱。',
+      send_reset_link: '寄出重設連結',
+      back_to_login: '← 返回登入',
+      reset_email_sent: '✓ 重設信件已寄出，請至信箱查收',
+      reset_title: '重設密碼',
+      reset_subtitle: '請輸入新密碼',
+      new_password: '新密碼',
+      confirm_password: '確認新密碼',
+      update_password: '更新密碼',
+      password_mismatch: '兩次密碼不一致',
+      password_updated: '✓ 密碼已更新，請使用新密碼登入',
+      // My account
+      my_account: '我的帳號',
+      profile: '個人資料',
+      display_name: '顯示名稱',
+      save_profile: '儲存個人資料',
+      change_password: '修改密碼',
+      profile_updated: '✓ 個人資料已更新',
+      password_changed: '✓ 密碼已成功更新',
       password: '密碼', your_name: '您的姓名',
       pwd_hint: '至少 8 碼',
       reg_company_hint: '第一個註冊此統編的人需填寫，後續同統編註冊會自動帶入',
@@ -1564,6 +1679,26 @@
       auth_subtitle: 'Online Quotation Manager',
       brand_title: 'Quotation System',
       auth_login: 'Login', auth_register: 'Register',
+      forgot_password: 'Forgot password?',
+      forgot_desc: 'Enter your email and we will send you a password reset link.',
+      send_reset_link: 'Send reset link',
+      back_to_login: '← Back to login',
+      reset_email_sent: '✓ Reset email sent. Please check your inbox.',
+      reset_title: 'Reset Password',
+      reset_subtitle: 'Enter your new password',
+      new_password: 'New password',
+      confirm_password: 'Confirm new password',
+      update_password: 'Update password',
+      password_mismatch: 'Passwords do not match',
+      password_updated: '✓ Password updated. Please login with your new password.',
+      // My account
+      my_account: 'My Account',
+      profile: 'Profile',
+      display_name: 'Display Name',
+      save_profile: 'Save Profile',
+      change_password: 'Change Password',
+      profile_updated: '✓ Profile updated',
+      password_changed: '✓ Password changed successfully',
       password: 'Password', your_name: 'Your Name',
       pwd_hint: 'min 8 chars',
       reg_company_hint: 'The first person to register this tax ID enters the company name. Later registrations inherit it.',
@@ -3181,12 +3316,166 @@
     }
   }
 
+  // ==========================================
+  // PASSWORD MANAGEMENT
+  // ==========================================
+  async function doForgotPassword(){
+    const email = $('forgot-email').value.trim();
+    const errEl = $('forgot-error');
+    errEl.textContent = ''; errEl.classList.remove('auth-success');
+    if(!email){ errEl.textContent = t('err_required'); return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ errEl.textContent = t('err_invalid_email'); return; }
+
+    const btn = $('btn-forgot-send');
+    btn.disabled = true;
+    const orig = btn.querySelector('span').textContent;
+    btn.querySelector('span').textContent = '...';
+    try {
+      const { error } = await supa.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
+      if(error) throw error;
+      errEl.classList.add('auth-success');
+      errEl.textContent = t('reset_email_sent');
+      $('forgot-email').value = '';
+    } catch(e){
+      console.error(e);
+      errEl.textContent = e.message || t('err_network');
+    } finally {
+      btn.disabled = false;
+      btn.querySelector('span').textContent = orig;
+    }
+  }
+
+  async function doResetPassword(){
+    const pw = $('reset-password').value;
+    const pw2 = $('reset-password-confirm').value;
+    const errEl = $('reset-error');
+    errEl.textContent = ''; errEl.classList.remove('auth-success');
+    if(pw.length < 8){ errEl.textContent = t('err_weak_password'); return; }
+    if(pw !== pw2){ errEl.textContent = t('password_mismatch'); return; }
+
+    const btn = $('btn-reset-submit');
+    btn.disabled = true;
+    try {
+      const { error } = await supa.auth.updateUser({ password: pw });
+      if(error) throw error;
+      errEl.classList.add('auth-success');
+      errEl.textContent = t('password_updated');
+      $('reset-password').value = ''; $('reset-password-confirm').value = '';
+      setTimeout(async () => {
+        await supa.auth.signOut();
+        window.location.hash = '';
+        window.location.reload();
+      }, 2000);
+    } catch(e){
+      errEl.textContent = e.message || t('err_network');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ==========================================
+  // MY ACCOUNT MODAL
+  // ==========================================
+  function openAccountModal(){
+    if(!currentUser || !currentMember) return;
+    $('acct-email').value = currentUser.email || '';
+    $('acct-display-name').value = currentMember.display_name || '';
+    $('acct-new-password').value = '';
+    $('acct-new-password-confirm').value = '';
+    $('acct-result').textContent = '';
+    $('account-modal').style.display = 'flex';
+  }
+  function closeAccountModal(){
+    $('account-modal').style.display = 'none';
+  }
+
+  async function saveProfile(){
+    const name = $('acct-display-name').value.trim();
+    const res = $('acct-result');
+    res.textContent = ''; res.style.color = '';
+    if(!name){
+      res.style.color = 'var(--danger)';
+      res.textContent = t('err_required');
+      return;
+    }
+    const btn = $('btn-save-profile');
+    btn.disabled = true;
+    try {
+      const { error } = await supa.from('members').update({ display_name: name }).eq('id', currentUser.id);
+      if(error) throw error;
+      currentMember.display_name = name;
+      $('user-name').textContent = name;
+      if($('from-contact').value && currentMember){
+        $('from-contact').value = name;
+      }
+      res.style.color = 'var(--accent)';
+      res.textContent = t('profile_updated');
+      toast(t('profile_updated'), 'success');
+    } catch(e){
+      res.style.color = 'var(--danger)';
+      res.textContent = e.message || t('err_network');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function changePassword(){
+    const pw = $('acct-new-password').value;
+    const pw2 = $('acct-new-password-confirm').value;
+    const res = $('acct-result');
+    res.textContent = ''; res.style.color = '';
+    if(pw.length < 8){
+      res.style.color = 'var(--danger)';
+      res.textContent = t('err_weak_password');
+      return;
+    }
+    if(pw !== pw2){
+      res.style.color = 'var(--danger)';
+      res.textContent = t('password_mismatch');
+      return;
+    }
+    const btn = $('btn-change-password');
+    btn.disabled = true;
+    try {
+      const { error } = await supa.auth.updateUser({ password: pw });
+      if(error) throw error;
+      $('acct-new-password').value = '';
+      $('acct-new-password-confirm').value = '';
+      res.style.color = 'var(--accent)';
+      res.textContent = t('password_changed');
+      toast(t('password_changed'), 'success');
+      setTimeout(() => { closeAccountModal(); }, 1500);
+    } catch(e){
+      res.style.color = 'var(--danger)';
+      res.textContent = e.message || t('err_network');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // Detect password recovery flow
+  function detectRecoveryFlow(){
+    const hash = window.location.hash;
+    if(hash.includes('type=recovery')){
+      $('auth-screen').style.display = 'none';
+      $('pending-screen').style.display = 'none';
+      const app = document.querySelector('.app');
+      if(app) app.style.display = 'none';
+      $('reset-screen').style.display = 'flex';
+      return true;
+    }
+    return false;
+  }
+
 
   document.querySelectorAll('[data-auth-tab]').forEach(b => b.addEventListener('click', () => {
     const which = b.dataset.authTab;
     document.querySelectorAll('[data-auth-tab]').forEach(x => x.classList.toggle('active', x === b));
     $('auth-login').style.display = which === 'login' ? '' : 'none';
     $('auth-register').style.display = which === 'register' ? '' : 'none';
+    if($('auth-forgot')) $('auth-forgot').style.display = 'none';
   }));
   $('btn-login').addEventListener('click', doLogin);
   $('btn-register').addEventListener('click', doRegister);
@@ -3194,6 +3483,35 @@
   $('btn-logout-pending').addEventListener('click', doLogout);
   $('btn-save-org').addEventListener('click', saveOrgSettings);
   $('btn-invite').addEventListener('click', sendInvite);
+
+  // Password management
+  $('link-forgot').addEventListener('click', e => {
+    e.preventDefault();
+    $('auth-login').style.display = 'none';
+    $('auth-register').style.display = 'none';
+    $('auth-forgot').style.display = '';
+    document.querySelectorAll('[data-auth-tab]').forEach(x => x.classList.remove('active'));
+  });
+  $('link-back-login').addEventListener('click', e => {
+    e.preventDefault();
+    $('auth-forgot').style.display = 'none';
+    $('auth-login').style.display = '';
+    document.querySelector('[data-auth-tab="login"]').classList.add('active');
+  });
+  $('btn-forgot-send').addEventListener('click', doForgotPassword);
+  $('btn-reset-submit').addEventListener('click', doResetPassword);
+  $('forgot-email').addEventListener('keydown', e => { if(e.key === 'Enter') doForgotPassword(); });
+  $('reset-password').addEventListener('keydown', e => { if(e.key === 'Enter') doResetPassword(); });
+  $('reset-password-confirm').addEventListener('keydown', e => { if(e.key === 'Enter') doResetPassword(); });
+
+  // Account modal
+  $('user-bar').addEventListener('click', openAccountModal);
+  $('account-close').addEventListener('click', closeAccountModal);
+  $('btn-save-profile').addEventListener('click', saveProfile);
+  $('btn-change-password').addEventListener('click', changePassword);
+  $('account-modal').addEventListener('click', e => {
+    // Don't auto-close on backdrop click
+  });
 
   // Enter key submits auth forms
   ['login-email','login-password'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); }));
@@ -3229,6 +3547,11 @@
 
   // Check session
   (async () => {
+    // First, detect if this is a password recovery flow (from email link)
+    if(detectRecoveryFlow()){
+      // Stay on reset screen; supabase listener will pick up the recovery session
+      return;
+    }
     const { data: { session } } = await supa.auth.getSession();
     if(session && session.user){
       await afterLogin(session.user);
@@ -3236,6 +3559,18 @@
       showAuthScreen();
     }
   })();
+
+  // Listen for auth state changes (e.g. PASSWORD_RECOVERY event from email link)
+  supa.auth.onAuthStateChange((event, session) => {
+    if(event === 'PASSWORD_RECOVERY'){
+      // Force showing reset screen
+      $('auth-screen').style.display = 'none';
+      $('pending-screen').style.display = 'none';
+      const app = document.querySelector('.app');
+      if(app) app.style.display = 'none';
+      $('reset-screen').style.display = 'flex';
+    }
+  });
 
   // Patch saveQuotes to also push to cloud
   const _saveQuotesLocal = saveQuotes;
