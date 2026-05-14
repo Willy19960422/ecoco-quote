@@ -1192,12 +1192,17 @@
     <!-- Data backup -->
     <div class="card">
       <p class="section-title"><span class="dot" style="background:#888"></span><span data-i18n="data_mgmt">資料備份</span></p>
-      <p style="font-size:12px; color:var(--text-2); margin:0 0 12px"><span data-i18n="data_mgmt_desc">所有資料儲存在瀏覽器本地，建議定期備份。換電腦時匯入備份即可還原。</span></p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap">
-        <button class="btn" id="btn-export"><span>⬇</span> <span data-i18n="export_data">匯出全部資料</span></button>
+      <p style="font-size:12px; color:var(--text-2); margin:0 0 12px"><span data-i18n="data_mgmt_desc">系統每次儲存會自動本地備份。建議定期匯出 JSON 檔到電腦做為長期保險。</span></p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 12px">
+        <button class="btn primary" id="btn-export"><span>⬇</span> <span data-i18n="export_data">下載完整備份 JSON</span></button>
         <button class="btn" id="btn-import"><span>⬆</span> <span data-i18n="import_data">匯入備份</span></button>
         <input type="file" id="import-file" accept=".json" style="display:none">
+        <button class="btn" id="btn-resync"><span>🔄</span> <span data-i18n="resync_cloud">重新同步至雲端</span></button>
       </div>
+      <details style="margin-top:10px">
+        <summary style="font-size:12px; cursor:pointer; color:var(--text-2)"><span data-i18n="auto_backups">自動本地備份（最近 10 次儲存快照）</span></summary>
+        <div id="auto-backups-list" style="margin-top:10px; font-size:12px"></div>
+      </details>
     </div>
   </div>
 
@@ -1549,8 +1554,15 @@
       tab_clients: '客戶', tab_products: '品項',
       duplicate: '複製', search_ph: '搜尋客戶名、報價單號...',
       data_mgmt: '資料備份',
-      data_mgmt_desc: '所有資料儲存在瀏覽器本地，建議定期備份。換電腦時匯入備份即可還原。',
-      export_data: '匯出全部資料', import_data: '匯入備份',
+      data_mgmt_desc: '系統每次儲存會自動本地備份。建議定期匯出 JSON 檔到電腦做為長期保險。',
+      export_data: '下載完整備份 JSON', import_data: '匯入備份',
+      resync_cloud: '重新同步至雲端',
+      auto_backups: '自動本地備份（最近 10 次儲存快照）',
+      restore_backup: '還原此版本',
+      no_auto_backups: '尚無自動備份',
+      resync_confirm: '將本地所有資料推送到雲端（不會清空雲端）。確定繼續？',
+      resync_done: '✓ 重新同步完成',
+      resync_progress: '同步中... ',
       clients_title: '客戶簿', add_client: '新增客戶', pick_client: '選取客戶',
       products_title: '常用品項', add_product: '新增品項', pick_product: '從品項庫',
       no_clients: '尚無儲存的客戶。儲存報價單時會自動加入。',
@@ -1679,8 +1691,15 @@
       tab_clients: 'Clients', tab_products: 'Items',
       duplicate: 'Duplicate', search_ph: 'Search by name, quote no...',
       data_mgmt: 'Data Backup',
-      data_mgmt_desc: 'All data is stored locally in your browser. Export regularly to back up. Import to restore on another device.',
-      export_data: 'Export All Data', import_data: 'Import Backup',
+      data_mgmt_desc: 'Auto-backed up locally on every save. Export JSON regularly to your computer as long-term insurance.',
+      export_data: 'Download Backup JSON', import_data: 'Import Backup',
+      resync_cloud: 'Re-sync to Cloud',
+      auto_backups: 'Auto local backups (last 10 snapshots)',
+      restore_backup: 'Restore this version',
+      no_auto_backups: 'No auto backups yet',
+      resync_confirm: 'Push all local data to cloud (will not clear cloud). Continue?',
+      resync_done: '✓ Re-sync done',
+      resync_progress: 'Syncing... ',
       clients_title: 'Client Book', add_client: 'Add Client', pick_client: 'Pick Client',
       products_title: 'Saved Items', add_product: 'Add Item', pick_product: 'From Library',
       no_clients: 'No saved clients yet. Saving a quote will auto-save the client.',
@@ -1781,6 +1800,99 @@
       return false;
     }
   }
+  // ==========================================
+  // AUTO BACKUP — protects against data loss
+  // ==========================================
+  const BACKUP_KEY_PREFIX = 'ecoco_autobackup_';
+  const MAX_BACKUPS = 10; // Keep last 10 snapshots
+
+  function autoBackup(label){
+    if(!currentMember) return;
+    try {
+      const snapshot = {
+        timestamp: new Date().toISOString(),
+        label: label || 'auto',
+        org_id: currentMember.org_id,
+        quotes: loadQuotes(),
+        clients: loadClients(),
+        products: loadProducts()
+      };
+      const key = BACKUP_KEY_PREFIX + currentMember.org_id + '_' + Date.now();
+      try {
+        localStorage.setItem(key, JSON.stringify(snapshot));
+      } catch(e){
+        // Storage full — remove oldest backup and retry
+        pruneBackups(currentMember.org_id, 1);
+        try { localStorage.setItem(key, JSON.stringify(snapshot)); } catch(e){}
+      }
+      pruneBackups(currentMember.org_id, MAX_BACKUPS);
+    } catch(e){
+      console.warn('autoBackup failed:', e);
+    }
+  }
+
+  function pruneBackups(orgId, keepCount){
+    const prefix = BACKUP_KEY_PREFIX + orgId + '_';
+    const keys = Object.keys(localStorage)
+      .filter(k => k.startsWith(prefix))
+      .sort();
+    while(keys.length > keepCount){
+      const oldest = keys.shift();
+      try { localStorage.removeItem(oldest); } catch(e){}
+    }
+  }
+
+  function listBackups(){
+    if(!currentMember) return [];
+    const prefix = BACKUP_KEY_PREFIX + currentMember.org_id + '_';
+    return Object.keys(localStorage)
+      .filter(k => k.startsWith(prefix))
+      .sort()
+      .reverse()
+      .map(k => {
+        try {
+          const data = JSON.parse(localStorage.getItem(k));
+          return { key: k, timestamp: data.timestamp, label: data.label,
+            quotes: (data.quotes||[]).length, clients: (data.clients||[]).length, products: (data.products||[]).length };
+        } catch(e){ return null; }
+      })
+      .filter(Boolean);
+  }
+
+  function restoreBackup(key){
+    try {
+      const data = JSON.parse(localStorage.getItem(key));
+      if(!data) return false;
+      if(data.quotes) saveQuotes(data.quotes);
+      if(data.clients) saveClients(data.clients);
+      if(data.products) saveProducts(data.products);
+      return true;
+    } catch(e){
+      console.error('Restore failed:', e);
+      return false;
+    }
+  }
+
+  function downloadBackupJson(){
+    if(!currentMember) return;
+    const data = {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      org_id: currentMember.org_id,
+      org_name: currentOrg && currentOrg.name || '',
+      quotes: loadQuotes(),
+      clients: loadClients(),
+      products: loadProducts()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'backup-' + (currentOrg && currentOrg.name || 'data').replace(/\s+/g, '_') + '-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ==========================================
   // DATA LAYER — local cache + Supabase sync
   // ==========================================
@@ -2027,6 +2139,8 @@
   }
 
   function newQuote(){
+    // Reset UUID for new quote
+    currentQuoteUuid = uid();
     state.items = [{desc:'',qty:1,price:0}];
     $('quote-no').value = genQuoteNo();
     $('quote-date').value = todayStr(0);
@@ -2068,9 +2182,14 @@
     }
   }
 
+  // Track UUID for current quote in editor (separate from human-readable quoteNo)
+  let currentQuoteUuid = null;
+
   function snapshot(){
+    // ID must be UUID (matches DB schema). Generate one if not set.
+    if(!currentQuoteUuid) currentQuoteUuid = uid();
     return {
-      id: $('quote-no').value || genQuoteNo(),
+      id: currentQuoteUuid,
       savedAt: new Date().toISOString(),
       lang: state.lang,
       currency: $('currency').value,
@@ -2103,6 +2222,8 @@
   }
 
   function loadSnapshot(q){
+    // Restore UUID so re-saving updates the same row
+    currentQuoteUuid = q.id || uid();
     $('currency').value = q.currency || 'TWD';
     $('quote-no').value = q.quoteNo || '';
     $('quote-date').value = q.quoteDate || todayStr(0);
@@ -2503,7 +2624,18 @@
     try { await supa.from('products').delete().eq('id', id); }
     catch(e){ console.error(e); }
   }
-  function uid(){ return 'id-' + Date.now() + '-' + Math.floor(Math.random()*9999); }
+  // Generate proper UUID v4 (matches Supabase PostgreSQL uuid type)
+  function uid(){
+    if(window.crypto && window.crypto.randomUUID){
+      return window.crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
 
   function getClientFromForm(){
     return {
@@ -2710,21 +2842,7 @@
 
   // --- Export / Import ---
   function exportAllData(){
-    const data = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      quotes: loadQuotes(),
-      clients: loadClients(),
-      products: loadProducts(),
-      logo: loadLogo() || null
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'ecoco-backup-' + new Date().toISOString().slice(0,10) + '.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBackupJson();
   }
   function importData(file){
     if(file.size > 10 * 1024 * 1024){
@@ -2850,6 +2968,80 @@
   $('import-file').addEventListener('change', e => {
     if(e.target.files[0]) importData(e.target.files[0]);
     e.target.value = '';
+  });
+
+  // Re-sync local to cloud
+  $('btn-resync').addEventListener('click', async () => {
+    if(!currentMember) return;
+    if(!confirm(t('resync_confirm'))) return;
+    const btn = $('btn-resync');
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    try {
+      const quotes = loadQuotes();
+      const clients = loadClients();
+      const products = loadProducts();
+      let done = 0, total = quotes.length + clients.length + products.length;
+      const updateProgress = () => {
+        btn.innerHTML = '⏳ ' + t('resync_progress') + done + '/' + total;
+      };
+      updateProgress();
+      for(const q of quotes){
+        try { await pushQuoteToCloud(q); } catch(e){ console.warn('quote push err', e); }
+        done++; updateProgress();
+      }
+      for(const c of clients){
+        try { await pushClientToCloud(c); } catch(e){ console.warn('client push err', e); }
+        done++; updateProgress();
+      }
+      for(const p of products){
+        try { await pushProductToCloud(p); } catch(e){ console.warn('product push err', e); }
+        done++; updateProgress();
+      }
+      toast(t('resync_done'), 'success');
+    } catch(e){
+      toast((state.lang==='en'?'Re-sync failed: ':'同步失敗：') + e.message, 'error');
+    } finally {
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    }
+  });
+
+  // Render auto-backups list inside <details>
+  function renderAutoBackupsList(){
+    const container = $('auto-backups-list');
+    if(!container) return;
+    const list = listBackups();
+    if(list.length === 0){
+      container.innerHTML = '<div style="color:var(--text-3); padding:8px 0">'+t('no_auto_backups')+'</div>';
+      return;
+    }
+    container.innerHTML = list.map(b =>
+      '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border)">'+
+        '<div>'+
+          '<div style="font-weight:500">'+new Date(b.timestamp).toLocaleString()+'</div>'+
+          '<div style="color:var(--text-3); font-size:11px">'+b.quotes+' 報價單, '+b.clients+' 客戶, '+b.products+' 品項</div>'+
+        '</div>'+
+        '<button class="btn" data-restore="'+b.key+'" style="padding:4px 10px; font-size:12px">'+t('restore_backup')+'</button>'+
+      '</div>'
+    ).join('');
+    container.querySelectorAll('[data-restore]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const key = e.currentTarget.dataset.restore;
+        if(!confirm(t('confirm_import'))) return;
+        if(restoreBackup(key)){
+          toast(t('import_success'), 'success');
+          renderHistory(); renderClientsList(); renderProductsList();
+        } else {
+          toast(t('import_fail'), 'error');
+        }
+      });
+    });
+  }
+  // Hook details element to render on open
+  document.addEventListener('DOMContentLoaded', () => {
+    const details = document.querySelector('#tab-history details');
+    if(details) details.addEventListener('toggle', () => { if(details.open) renderAutoBackupsList(); });
   });
   $('lang').addEventListener('change', e => {
     state.lang = e.target.value;
@@ -3815,8 +4007,8 @@
     const isUpdate = i >= 0;
     if(isUpdate) arr[i] = s; else arr.push(s);
     _saveQuotesLocal(arr);
-    // Cloud push
-    await pushQuoteToCloud(s);
+    // Cloud push (won't block UI even if it fails — we have local + autoBackup)
+    pushQuoteToCloud(s).catch(e => console.warn('cloud push failed but local saved', e));
     // Auto-save client
     const c = getClientFromForm();
     if(c.name){
@@ -3825,11 +4017,13 @@
       c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
       if(idx >= 0) cArr[idx] = c; else cArr.push(c);
       saveClients(cArr);
-      await pushClientToCloud(c);
+      pushClientToCloud(c).catch(e => console.warn('client push failed', e));
     }
+    // Auto-backup snapshot to localStorage (safety net)
+    autoBackup('after-save');
     const msg = state.lang === 'en'
-      ? (isUpdate ? '✓ Quote updated' : '✓ Saved to cloud')
-      : (isUpdate ? '✓ 已更新報價單' : '✓ 已儲存至雲端');
+      ? (isUpdate ? '✓ Quote updated' : '✓ Saved')
+      : (isUpdate ? '✓ 已更新報價單' : '✓ 已儲存');
     toast(msg, 'success');
   });
 
