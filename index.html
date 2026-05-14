@@ -577,20 +577,23 @@
   /* User bar in topbar */
   .user-bar {
     display: flex; align-items: center; gap: 6px;
-    padding: 4px 10px;
-    background: var(--surface-2);
-    border: 1px solid transparent;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
-    font-size: 12px;
-    color: var(--text-2);
+    font-size: 13px;
+    color: var(--text);
     cursor: pointer;
     font-family: inherit;
-    transition: border-color 0.15s, background 0.15s;
+    transition: all 0.15s;
   }
   .user-bar:hover {
-    border-color: var(--border-strong);
-    background: var(--bg);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   }
+  .user-bar:active { transform: translateY(0); }
   .user-bar strong { color: var(--text); font-weight: 500; }
   .user-bar .org-badge {
     font-size: 10px;
@@ -980,9 +983,11 @@
         <span class="ico">👤</span> <span data-i18n="tab_members">成員</span>
         <span id="pending-badge" style="display:none; background:var(--danger); color:white; padding:1px 6px; border-radius:10px; font-size:10px; margin-left:4px"></span>
       </button>
-      <button class="user-bar" id="user-bar" title="點選開啟帳號設定">
+      <button class="user-bar" id="user-bar" title="我的帳號設定（修改密碼、姓名等）">
+        <span style="font-size:14px">👤</span>
         <strong id="user-name"></strong>
         <span class="org-badge" id="user-role"></span>
+        <span style="font-size:10px; color:var(--text-3); margin-left:2px">▼</span>
       </button>
       <button class="tab-btn" id="btn-logout" title="登出"><span data-i18n="logout">登出</span></button>
       <select id="lang" class="lang-select">
@@ -3441,6 +3446,27 @@
     // Show app
     showApp();
 
+    // First-time hint: pulse the user-bar so people notice it's clickable
+    const hintKey = 'ecoco_user_bar_hint_seen_' + user.id;
+    if(!safeGet(hintKey)){
+      setTimeout(() => {
+        const ub = $('user-bar');
+        if(!ub) return;
+        ub.style.animation = 'pulse-hint 1.5s ease-in-out 3';
+        // Add CSS for animation if not yet
+        if(!document.getElementById('pulse-hint-style')){
+          const s = document.createElement('style');
+          s.id = 'pulse-hint-style';
+          s.textContent = '@keyframes pulse-hint { 0%,100% { box-shadow: 0 0 0 0 rgba(15,110,86,0.4); } 50% { box-shadow: 0 0 0 8px rgba(15,110,86,0); } }';
+          document.head.appendChild(s);
+        }
+        // Mark as seen
+        safeSet(hintKey, '1');
+        // Stop after 3 pulses
+        setTimeout(() => { ub.style.animation = ''; }, 4500);
+      }, 1000);
+    }
+
     // Initial sync
     await Promise.all([
       syncQuotesFromCloud(),
@@ -3469,6 +3495,13 @@
     const tb = $('topbar-company-name');
     tb.setAttribute('data-i18n', 'brand_title');
     tb.textContent = t('brand_title');
+    // Force switch back to login tab (not register tab)
+    document.querySelectorAll('[data-auth-tab]').forEach(b => {
+      b.classList.toggle('active', b.dataset.authTab === 'login');
+    });
+    $('auth-login').style.display = '';
+    $('auth-register').style.display = 'none';
+    if($('auth-forgot')) $('auth-forgot').style.display = 'none';
     showAuthScreen();
   }
 
