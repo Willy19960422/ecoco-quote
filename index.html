@@ -628,7 +628,7 @@
   }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .sync-indicator.error::before {
-    content: '⚠'; color: var(--danger);
+    content: ''; color: var(--danger);
   }
 
 
@@ -965,26 +965,26 @@
     </div>
     <div class="controls">
       <button class="tab-btn active" data-tab="editor">
-        <span class="ico">✎</span> <span data-i18n="tab_editor">編輯</span>
+        <span class="ico"></span> <span data-i18n="tab_editor">編輯</span>
       </button>
       <button class="tab-btn" data-tab="history">
         <span class="ico">⌛</span> <span data-i18n="tab_history">歷史</span>
       </button>
       <button class="tab-btn" data-tab="clients">
-        <span class="ico">👥</span> <span data-i18n="tab_clients">客戶</span>
+        <span class="ico"></span> <span data-i18n="tab_clients">客戶</span>
       </button>
       <button class="tab-btn" data-tab="products">
-        <span class="ico">📦</span> <span data-i18n="tab_products">品項</span>
+        <span class="ico"></span> <span data-i18n="tab_products">品項</span>
       </button>
       <button class="tab-btn" data-tab="org">
-        <span class="ico">🏢</span> <span data-i18n="tab_org">組織</span>
+        <span class="ico"></span> <span data-i18n="tab_org">組織</span>
       </button>
       <button class="tab-btn" data-tab="members" id="tab-btn-members" style="display:none">
-        <span class="ico">👤</span> <span data-i18n="tab_members">成員</span>
+        <span class="ico"></span> <span data-i18n="tab_members">成員</span>
         <span id="pending-badge" style="display:none; background:var(--danger); color:white; padding:1px 6px; border-radius:10px; font-size:10px; margin-left:4px"></span>
       </button>
       <button class="user-bar" id="user-bar" title="我的帳號設定（修改密碼、姓名等）">
-        <span style="font-size:14px">👤</span>
+        <span style="font-size:14px"></span>
         <strong id="user-name"></strong>
         <span class="org-badge" id="user-role"></span>
         <span style="font-size:10px; color:var(--text-3); margin-left:2px">▼</span>
@@ -1082,8 +1082,8 @@
               <label data-i18n="client_name">客戶名稱</label>
               <div style="display:flex; gap:6px">
                 <input type="text" id="to-name" autocomplete="organization" style="flex:1" />
-                <button type="button" class="btn" id="pick-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="從客戶簿選取">📚</button>
-                <button type="button" class="btn" id="save-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="儲存此客戶">💾</button>
+                <button type="button" class="btn" id="pick-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="從客戶簿選取"></button>
+                <button type="button" class="btn" id="save-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="儲存此客戶"></button>
               </div>
             </div>
             <div class="field">
@@ -1132,7 +1132,7 @@
       </div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
         <button class="add-row-btn" id="add-row" style="flex:1">+ <span data-i18n="add_item">新增項目</span></button>
-        <button class="add-row-btn" id="pick-product" style="flex:1; border-style:solid; color:var(--accent); border-color:var(--accent)">📦 <span data-i18n="pick_product">從品項庫</span></button>
+        <button class="add-row-btn" id="pick-product" style="flex:1; border-style:solid; color:var(--accent); border-color:var(--accent)"><span data-i18n="pick_product">從品項庫</span></button>
       </div>
     </div>
 
@@ -1179,10 +1179,10 @@
     <div class="actions no-print">
       <button class="btn" id="btn-new">+ <span data-i18n="new">新報價單</span></button>
       <button class="btn" id="btn-duplicate">⎘ <span data-i18n="duplicate">複製</span></button>
-      <button class="btn" id="btn-save">💾 <span data-i18n="save">儲存</span></button>
-      <button class="btn" id="btn-print">🖨 <span data-i18n="print">列印</span></button>
-      <button class="btn" id="btn-pdf">📄 <span data-i18n="pdf">匯出 PDF</span></button>
-      <button class="btn primary" id="btn-send">✉ <span data-i18n="send_email">寄送給客戶</span></button>
+      <button class="btn" id="btn-save"><span data-i18n="save">儲存</span></button>
+      <button class="btn" id="btn-print"><span data-i18n="print">列印</span></button>
+      <button class="btn" id="btn-pdf"><span data-i18n="pdf">匯出 PDF</span></button>
+      <button class="btn primary" id="btn-send"><span data-i18n="send_email">寄送給客戶</span></button>
     </div>
   </div>
 
@@ -1199,10 +1199,10 @@
       <p class="section-title"><span class="dot" style="background:#888"></span><span data-i18n="data_mgmt">資料備份</span></p>
       <p style="font-size:12px; color:var(--text-2); margin:0 0 12px"><span data-i18n="data_mgmt_desc">系統每次儲存會自動本地備份。建議定期匯出 JSON 檔到電腦做為長期保險。</span></p>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 12px">
-        <button class="btn primary" id="btn-export"><span>⬇</span> <span data-i18n="export_data">下載完整備份 JSON</span></button>
-        <button class="btn" id="btn-import"><span>⬆</span> <span data-i18n="import_data">匯入備份</span></button>
+        <button class="btn primary" id="btn-export"><span></span> <span data-i18n="export_data">下載完整備份 JSON</span></button>
+        <button class="btn" id="btn-import"><span></span> <span data-i18n="import_data">匯入備份</span></button>
         <input type="file" id="import-file" accept=".json" style="display:none">
-        <button class="btn" id="btn-resync"><span>🔄</span> <span data-i18n="resync_cloud">重新同步至雲端</span></button>
+        <button class="btn" id="btn-resync"><span></span> <span data-i18n="resync_cloud">重新同步至雲端</span></button>
       </div>
       <details style="margin-top:10px">
         <summary style="font-size:12px; cursor:pointer; color:var(--text-2)"><span data-i18n="auto_backups">自動本地備份（最近 10 次儲存快照）</span></summary>
@@ -1248,9 +1248,13 @@
             <input type="text" id="org-tax-id" disabled style="background:var(--surface-2)" />
           </div>
           <div class="field">
-            <label data-i18n="company_name">公司名稱</label>
-            <input type="text" id="org-name" />
+            <label data-i18n="org_system_code">系統代號（報價單編號使用）</label>
+            <input type="text" id="org-code-display" disabled style="background:var(--surface-2); font-family:monospace; font-weight:600" />
           </div>
+        </div>
+        <div class="field">
+          <label data-i18n="company_name">公司名稱</label>
+          <input type="text" id="org-name" />
         </div>
         <div class="field">
           <label data-i18n="address">地址</label>
@@ -1267,7 +1271,7 @@
           </div>
         </div>
         <div style="text-align:right; margin-top:6px">
-          <button class="btn primary" id="btn-save-org">💾 <span data-i18n="save">儲存</span></button>
+          <button class="btn primary" id="btn-save-org"><span data-i18n="save">儲存</span></button>
         </div>
       </div>
     </div>
@@ -1323,7 +1327,7 @@
           <input type="text" id="acct-display-name" />
         </div>
         <div style="text-align:right">
-          <button class="btn primary" id="btn-save-profile">💾 <span data-i18n="save_profile">儲存個人資料</span></button>
+          <button class="btn primary" id="btn-save-profile"><span data-i18n="save_profile">儲存個人資料</span></button>
         </div>
       </div>
 
@@ -1341,7 +1345,7 @@
           <input type="password" id="acct-new-password-confirm" autocomplete="new-password" minlength="8" />
         </div>
         <div style="text-align:right">
-          <button class="btn primary" id="btn-change-password">🔒 <span data-i18n="update_password">更新密碼</span></button>
+          <button class="btn primary" id="btn-change-password"><span data-i18n="update_password">更新密碼</span></button>
         </div>
         <p id="acct-result" style="font-size:12px; margin:10px 0 0; text-align:center; min-height:18px"></p>
       </div>
@@ -1399,7 +1403,7 @@
       <div id="step-1-panel">
 
         <div class="warn-box" id="email-warn" style="display:none">
-          <strong>⚠ <span data-i18n="warn_no_email">無法寄送</span></strong>
+          <strong><span data-i18n="warn_no_email">無法寄送</span></strong>
           <p data-i18n="warn_no_email_desc">客戶 Email 為空，請先到客戶資料區填寫 Email 後再試。</p>
         </div>
 
@@ -1432,7 +1436,7 @@
         </div>
 
         <div class="attach-box">
-          <div class="attach-icon">📎</div>
+          <div class="attach-icon"></div>
           <div style="flex:1">
             <div style="font-size:13px; font-weight:500" id="attach-filename">quotation.pdf</div>
             <div style="font-size:11px; color:var(--text-3); margin-top:2px" data-i18n="attach_hint">PDF 會自動下載；開啟郵件草稿後請將下載的 PDF 拖入信件附件區。</div>
@@ -1440,7 +1444,7 @@
         </div>
 
         <div class="modal-info">
-          <strong data-i18n="info_title">📌 寄送方式說明</strong>
+          <strong data-i18n="info_title">寄送方式說明</strong>
           <p data-i18n="info_desc">點下「下一步」後，瀏覽器會：<br>1. 自動下載報價單 PDF 到您的電腦<br>2. 開啟系統預設郵件程式並帶入收件人、主旨、內文<br>3. 您只需在郵件草稿中加入剛下載的 PDF 為附件，並按送出即可</p>
         </div>
 
@@ -1449,11 +1453,11 @@
       <!-- Step 2: Final Confirm -->
       <div id="step-2-panel" style="display:none">
         <div class="confirm-box">
-          <div class="confirm-icon">✉</div>
+          <div class="confirm-icon"></div>
           <h3 data-i18n="confirm_title">確定寄送此報價單？</h3>
           <div class="confirm-summary" id="confirm-summary"></div>
           <div class="confirm-warn">
-            <strong data-i18n="confirm_warn_title">⚠ 寄出後將無法收回</strong>
+            <strong data-i18n="confirm_warn_title">寄出後將無法收回</strong>
             <p data-i18n="confirm_warn_desc">請再次確認收件人、主旨與報價金額正確無誤。</p>
           </div>
         </div>
@@ -1465,7 +1469,7 @@
       <button class="btn" id="modal-cancel" data-i18n="cancel">取消</button>
       <button class="btn" id="modal-back" style="display:none" data-i18n="back">← 返回修改</button>
       <button class="btn primary" id="modal-next"><span data-i18n="next_review">下一步：最終確認</span> →</button>
-      <button class="btn accent" id="modal-send" style="display:none">✓ <span data-i18n="confirm_send">確定寄送</span></button>
+      <button class="btn accent" id="modal-send" style="display:none"><span data-i18n="confirm_send">確定寄送</span></button>
     </div>
   </div>
 
@@ -1512,6 +1516,7 @@
       quote_no: '報價單編號', quote_date: '日期', valid_until: '有效期至', currency: '貨幣',
       from: '寄件方', to: '客戶',
       company_name: '公司名稱', client_name: '客戶名稱',
+      org_system_code: '系統代號（報價單編號使用）',
       contact_person: '報價人', contact_person_to: '聯絡人',
       address: '地址', phone: '電話', email: 'Email', tax_id: '統一編號',
       items: '項目', desc: '品名 / 描述', qty: '數量', unit_price: '單價', amount: '小計',
@@ -1538,7 +1543,7 @@
       mail_subject: '主旨',
       mail_body: '內文',
       attach_hint: 'PDF 將自動上傳到雲端並產生下載連結，附在郵件內文。',
-      info_title: '📌 寄送方式說明',
+      info_title: '寄送方式說明',
       info_desc: '點下「下一步」並確認後，系統將自動：<br>1. 產生報價單 PDF 並上傳至雲端<br>2. 透過 Email 系統自動寄出（內文含 PDF 下載連結）<br>3. 全程自動，無需開啟任何郵件程式',
       warn_no_email: '無法寄送',
       warn_no_email_desc: '客戶 Email 為空，請先到客戶資料區填寫 Email 後再試。',
@@ -1546,7 +1551,7 @@
       next_review: '下一步：最終確認',
       confirm_send: '確定寄送',
       confirm_title: '確定寄送此報價單？',
-      confirm_warn_title: '⚠ 寄出後將無法收回',
+      confirm_warn_title: '寄出後將無法收回',
       confirm_warn_desc: '請再次確認收件人、主旨與報價金額正確無誤。',
       conf_to: '收件人',
       conf_subject: '主旨',
@@ -1566,7 +1571,7 @@
       restore_backup: '還原此版本',
       no_auto_backups: '尚無自動備份',
       resync_confirm: '將本地所有資料推送到雲端（不會清空雲端）。確定繼續？',
-      resync_done: '✓ 重新同步完成',
+      resync_done: '重新同步完成',
       resync_progress: '同步中... ',
       clients_title: '客戶簿', add_client: '新增客戶', pick_client: '選取客戶',
       products_title: '常用品項', add_product: '新增品項', pick_product: '從品項庫',
@@ -1587,22 +1592,22 @@
       forgot_desc: '輸入您的 Email，系統會寄一封重設密碼的連結到信箱。',
       send_reset_link: '寄出重設連結',
       back_to_login: '← 返回登入',
-      reset_email_sent: '✓ 重設信件已寄出，請至信箱查收',
+      reset_email_sent: '重設信件已寄出，請至信箱查收',
       reset_title: '重設密碼',
       reset_subtitle: '請輸入新密碼',
       new_password: '新密碼',
       confirm_password: '確認新密碼',
       update_password: '更新密碼',
       password_mismatch: '兩次密碼不一致',
-      password_updated: '✓ 密碼已更新，請使用新密碼登入',
+      password_updated: '密碼已更新，請使用新密碼登入',
       // My account
       my_account: '我的帳號',
       profile: '個人資料',
       display_name: '顯示名稱',
       save_profile: '儲存個人資料',
       change_password: '修改密碼',
-      profile_updated: '✓ 個人資料已更新',
-      password_changed: '✓ 密碼已成功更新',
+      profile_updated: '個人資料已更新',
+      password_changed: '密碼已成功更新',
       password: '密碼', your_name: '您的姓名',
       pwd_hint: '至少 8 碼',
       reg_company_hint: '第一個註冊此統編的人需填寫，後續同統編註冊會自動帶入',
@@ -1632,7 +1637,7 @@
       new_member_email: '新成員 Email',
       new_member_name: '姓名',
       send_invite: '寄出邀請',
-      invite_sent: '✓ 邀請已寄出，請通知對方收信',
+      invite_sent: '邀請已寄出，請通知對方收信',
       invite_failed: '邀請失敗：',
       invite_existing: '此 Email 已是組織成員',
       remove_member: '移除',
@@ -1649,6 +1654,7 @@
       quote_no: 'Quote No.', quote_date: 'Date', valid_until: 'Valid Until', currency: 'Currency',
       from: 'From', to: 'Bill To',
       company_name: 'Company', client_name: 'Client',
+      org_system_code: 'System Code (used in quote number)',
       contact_person: 'Issued By', contact_person_to: 'Contact',
       address: 'Address', phone: 'Phone', email: 'Email', tax_id: 'Tax ID',
       items: 'Items', desc: 'Description', qty: 'Qty', unit_price: 'Unit Price', amount: 'Amount',
@@ -1675,7 +1681,7 @@
       mail_subject: 'Subject',
       mail_body: 'Message',
       attach_hint: 'PDF will be uploaded to cloud and a download link included in the message body.',
-      info_title: '📌 How sending works',
+      info_title: 'How sending works',
       info_desc: 'After confirmation, the system will automatically:<br>1. Generate the quotation PDF and upload to cloud<br>2. Send the email via email service (with PDF download link in body)<br>3. Fully automated, no email app required',
       warn_no_email: 'Cannot Send',
       warn_no_email_desc: 'Client Email is empty. Please fill in the client Email field first.',
@@ -1683,7 +1689,7 @@
       next_review: 'Next: Final Confirm',
       confirm_send: 'Confirm & Send',
       confirm_title: 'Send this quotation?',
-      confirm_warn_title: '⚠ This action cannot be undone',
+      confirm_warn_title: 'This action cannot be undone',
       confirm_warn_desc: 'Please verify the recipient, subject, and total amount are correct.',
       conf_to: 'To',
       conf_subject: 'Subject',
@@ -1703,7 +1709,7 @@
       restore_backup: 'Restore this version',
       no_auto_backups: 'No auto backups yet',
       resync_confirm: 'Push all local data to cloud (will not clear cloud). Continue?',
-      resync_done: '✓ Re-sync done',
+      resync_done: 'Re-sync done',
       resync_progress: 'Syncing... ',
       clients_title: 'Client Book', add_client: 'Add Client', pick_client: 'Pick Client',
       products_title: 'Saved Items', add_product: 'Add Item', pick_product: 'From Library',
@@ -1724,22 +1730,22 @@
       forgot_desc: 'Enter your email and we will send you a password reset link.',
       send_reset_link: 'Send reset link',
       back_to_login: '← Back to login',
-      reset_email_sent: '✓ Reset email sent. Please check your inbox.',
+      reset_email_sent: 'Reset email sent. Please check your inbox.',
       reset_title: 'Reset Password',
       reset_subtitle: 'Enter your new password',
       new_password: 'New password',
       confirm_password: 'Confirm new password',
       update_password: 'Update password',
       password_mismatch: 'Passwords do not match',
-      password_updated: '✓ Password updated. Please login with your new password.',
+      password_updated: 'Password updated. Please login with your new password.',
       // My account
       my_account: 'My Account',
       profile: 'Profile',
       display_name: 'Display Name',
       save_profile: 'Save Profile',
       change_password: 'Change Password',
-      profile_updated: '✓ Profile updated',
-      password_changed: '✓ Password changed successfully',
+      profile_updated: 'Profile updated',
+      password_changed: 'Password changed successfully',
       password: 'Password', your_name: 'Your Name',
       pwd_hint: 'min 8 chars',
       reg_company_hint: 'The first person to register this tax ID enters the company name. Later registrations inherit it.',
@@ -1769,7 +1775,7 @@
       new_member_email: 'New Member Email',
       new_member_name: 'Name',
       send_invite: 'Send Invite',
-      invite_sent: '✓ Invitation sent, please notify them to check inbox',
+      invite_sent: 'Invitation sent, please notify them to check inbox',
       invite_failed: 'Invite failed: ',
       invite_existing: 'This email is already a member',
       remove_member: 'Remove',
@@ -1922,13 +1928,13 @@
             syncClientsFromCloud(),
             syncProductsFromCloud()
           ]);
-          toast(state.lang === 'en' ? '✓ Sync successful' : '✓ 同步成功', 'success');
+          toast(state.lang === 'en' ? 'Sync successful' : '同步成功', 'success');
           if($('tab-history').style.display !== 'none') renderHistory();
           if($('tab-clients').style.display !== 'none') renderClientsList();
           if($('tab-products').style.display !== 'none') renderProductsList();
         } catch(e){
           console.error('[Retry failed]', e);
-          toast((state.lang === 'en' ? '✗ Retry failed: ' : '✗ 重試仍失敗：') + (e.message || ''), 'error');
+          toast((state.lang === 'en' ? 'Retry failed: ' : '重試仍失敗：') + (e.message || ''), 'error');
         }
       });
     }
@@ -2009,7 +2015,8 @@
         discType: q.disc_type,
         discVal: parseFloat(q.disc_val)||0,
         taxRate: parseFloat(q.tax_rate)||0,
-        total: parseFloat(q.total)||0
+        total: parseFloat(q.total)||0,
+        dailySeq: q.daily_seq || null
       }));
       saveQuotes(local);
       setSyncing(false);
@@ -2034,7 +2041,8 @@
         disc_type: snap.discType || 'pct',
         disc_val: snap.discVal || 0,
         tax_rate: snap.taxRate || 0,
-        total: snap.total || 0
+        total: snap.total || 0,
+        daily_seq: snap.dailySeq || null
       };
       const { error } = await supa.from('quotes').upsert(row);
       if(error) throw error;
@@ -2079,10 +2087,49 @@
   function curSym(){ return (currencies[$('currency').value] || currencies.TWD).symbol; }
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
   function todayStr(off){ const d = new Date(); d.setDate(d.getDate()+(off||0)); return d.toISOString().slice(0,10); }
+  // Quote number is generated when saving (uses org_code + daily sequence).
+  // This function returns a *placeholder* showing the format so users see something in the field.
   function genQuoteNo(){
     const d = new Date();
     const ymd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
-    return 'Q-' + ymd + '-' + String(Math.floor(Math.random()*900+100));
+    const orgCode = (currentOrg && currentOrg.org_code) ? String(currentOrg.org_code).padStart(5,'0') : '00000';
+    return 'Q-' + ymd + '-' + orgCode + '-?????';  // ????? = will be filled on save
+  }
+
+  // Compute next daily sequence for this org by querying cloud (with local fallback)
+  async function computeNextDailySeq(){
+    const today = todayStr(0); // YYYY-MM-DD
+    if(!currentMember){
+      // Offline: count from local cache
+      const arr = loadQuotes();
+      const todays = arr.filter(q => (q.quoteDate || '').slice(0,10) === today);
+      return todays.length + 1;
+    }
+    try {
+      // Ask cloud for max daily_seq today
+      const { data, error } = await supa
+        .from('quotes')
+        .select('daily_seq')
+        .eq('org_id', currentMember.org_id)
+        .eq('quote_date', today)
+        .order('daily_seq', { ascending: false })
+        .limit(1);
+      if(error) throw error;
+      if(!data || data.length === 0) return 1;
+      return (data[0].daily_seq || 0) + 1;
+    } catch(e){
+      console.warn('computeNextDailySeq fallback to local:', e);
+      const arr = loadQuotes();
+      const todays = arr.filter(q => (q.quoteDate || '').slice(0,10) === today);
+      return todays.length + 1;
+    }
+  }
+
+  function formatQuoteNo(orgCode, dateStr, seq){
+    const ymd = (dateStr || todayStr(0)).replace(/-/g, '');
+    const code = String(orgCode || 0).padStart(5, '0');
+    const sq = String(seq || 1).padStart(5, '0');
+    return 'Q-' + ymd + '-' + code + '-' + sq;
   }
 
   function renderItems(){
@@ -2182,7 +2229,7 @@
         qn.style.backgroundColor = 'var(--accent-soft)';
         setTimeout(() => { qn.style.backgroundColor = ''; }, 1200);
       }
-      const msg = state.lang === 'en' ? '✓ New quote ready: ' + ($('quote-no').value||'') : '✓ 已建立新報價單：' + ($('quote-no').value||'');
+      const msg = state.lang === 'en' ? 'New quote ready: ' + ($('quote-no').value||'') : '已建立新報價單：' + ($('quote-no').value||'');
       toast(msg, 'success');
     }
   }
@@ -2222,7 +2269,8 @@
       discType: $('disc-type').value,
       discVal: parseFloat($('disc-val').value)||0,
       taxRate: parseFloat($('tax-rate').value)||0,
-      total: recalc().total
+      total: recalc().total,
+      dailySeq: (window._pendingDailySeq || null)
     };
   }
 
@@ -2282,7 +2330,7 @@
         '</div>'+
         '<div class="history-actions">'+
           '<button class="btn" data-load="'+escapeHtml(q.id)+'">↗ '+t('load')+'</button>'+
-          '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">🗑</button>'+
+          '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)"></button>'+
         '</div>';
       list.appendChild(div);
     });
@@ -2688,8 +2736,8 @@
         '</div>'+
         '<div class="history-actions">'+
           '<button class="btn" data-use="'+c.id+'">↗ '+t('load')+'</button>'+
-          '<button class="btn" data-edit-c="'+c.id+'">✎</button>'+
-          '<button class="btn" data-del-c="'+c.id+'" style="color:var(--danger)">🗑</button>'+
+          '<button class="btn" data-edit-c="'+c.id+'"></button>'+
+          '<button class="btn" data-del-c="'+c.id+'" style="color:var(--danger)"></button>'+
         '</div>';
       list.appendChild(div);
     });
@@ -2723,8 +2771,8 @@
           '<span>'+curSym()+' '+fmt(p.price||0)+'</span>'+
         '</div>'+
         '<div class="history-actions">'+
-          '<button class="btn" data-edit-p="'+p.id+'">✎</button>'+
-          '<button class="btn" data-del-p="'+p.id+'" style="color:var(--danger)">🗑</button>'+
+          '<button class="btn" data-edit-p="'+p.id+'"></button>'+
+          '<button class="btn" data-del-p="'+p.id+'" style="color:var(--danger)"></button>'+
         '</div>';
       list.appendChild(div);
     });
@@ -2907,8 +2955,8 @@
     setTimeout(() => { qn.style.backgroundColor = ''; }, 1200);
     const newNo = qn.value;
     const msg = state.lang === 'en'
-      ? '✓ Duplicated as new quote: ' + newNo
-      : '✓ 已複製為新報價單：' + newNo;
+      ? 'Duplicated as new quote: ' + newNo
+      : '已複製為新報價單：' + newNo;
     toast(msg, 'success');
   }
 
@@ -2935,8 +2983,8 @@
     }
     if(ok !== false){
       const msg = state.lang === 'en'
-        ? (isUpdate ? '✓ Quote updated' : '✓ Saved to history')
-        : (isUpdate ? '✓ 已更新報價單' : '✓ 已儲存至歷史');
+        ? (isUpdate ? 'Quote updated' : 'Saved to history')
+        : (isUpdate ? '已更新報價單' : '已儲存至歷史');
       toast(msg, 'success');
     }
   });
@@ -3147,7 +3195,7 @@
       [t('conf_to'), escapeHtml(to) + (cc ? '<br><span style="color:var(--text-3); font-weight:400; font-size:11px">CC: '+escapeHtml(cc)+'</span>' : '')],
       [t('conf_subject'), escapeHtml(subj)],
       [t('conf_quote'), escapeHtml(ctx.quoteNo)],
-      [t('conf_attach'), '📎 ' + escapeHtml(filename)]
+      [t('conf_attach'), '' + escapeHtml(filename)]
     ];
     let html = '';
     rows.forEach(r => {
@@ -3226,8 +3274,8 @@
       // STEP 3: Build full message with PDF link
       const linkBlock = pdfUrl
         ? '\n\n' + (state.lang === 'en'
-            ? '📎 Download quotation PDF: ' + pdfUrl
-            : '📎 下載報價單 PDF：' + pdfUrl)
+            ? 'Download quotation PDF: ' + pdfUrl
+            : '下載報價單 PDF：' + pdfUrl)
         : '';
       const fullMessage = userBody + linkBlock;
 
@@ -3259,7 +3307,7 @@
       sendBtn.disabled = false;
       sendBtn.innerHTML = original;
       closeEmailModal();
-      toast(state.lang === 'en' ? '✓ Quotation sent to ' + to : '✓ 報價單已寄送至 ' + to, 'success');
+      toast(state.lang === 'en' ? 'Quotation sent to ' + to : '報價單已寄送至 ' + to, 'success');
 
     } catch(err){
       console.error('Send error:', err);
@@ -3401,6 +3449,16 @@
       });
       if(rpcErr){ authError('register', rpcErr.message); return; }
 
+      // Show org code if this user just created a new org
+      if(rpc && rpc.status === 'created_org' && rpc.org_code){
+        const code = String(rpc.org_code).padStart(5, '0');
+        setTimeout(() => {
+          toast(state.lang === 'en'
+            ? 'Your company code: ' + code
+            : '您公司的系統代號：' + code, 'success');
+        }, 1200);
+      }
+
       // 4. Refresh user context
       const { data: { user } } = await supa.auth.getUser();
       await afterLogin(user);
@@ -3522,6 +3580,9 @@
   function renderOrgSettings(){
     if(!currentOrg) return;
     $('org-tax-id').value = currentOrg.tax_id || '';
+    $('org-code-display').value = currentOrg.org_code 
+      ? String(currentOrg.org_code).padStart(5, '0') 
+      : (state.lang === 'en' ? '(not assigned)' : '（未分配）');
     $('org-name').value = currentOrg.name || '';
     $('org-address').value = currentOrg.address || '';
     $('org-phone').value = currentOrg.phone || '';
@@ -3553,11 +3614,11 @@
       // Update topbar company name immediately
       if(updates.name){ $('topbar-company-name').textContent = updates.name; }
       // Visible success
-      btn.innerHTML = '✓ ' + (state.lang === 'en' ? 'Saved!' : '已儲存！');
+      btn.innerHTML = '' + (state.lang === 'en' ? 'Saved!' : '已儲存！');
       btn.style.background = 'var(--accent)';
       btn.style.color = 'white';
       btn.style.borderColor = 'var(--accent)';
-      toast(state.lang === 'en' ? '✓ Basic info saved to cloud' : '✓ 基本資料已儲存至雲端', 'success');
+      toast(state.lang === 'en' ? 'Basic info saved to cloud' : '基本資料已儲存至雲端', 'success');
       setTimeout(() => {
         btn.innerHTML = origText;
         btn.style.background = '';
@@ -3602,7 +3663,7 @@
       pl.innerHTML = pending.map(m =>
         '<div class="pending-member-item">'+
           '<div class="pm-info"><strong>'+escapeHtml(m.display_name||'')+'</strong><span>'+escapeHtml(m.email)+'</span></div>'+
-          '<button class="btn primary" data-approve="'+m.id+'">✓ '+t('approve')+'</button>'+
+          '<button class="btn primary" data-approve="'+m.id+'">'+t('approve')+'</button>'+
         '</div>'
       ).join('');
       pl.querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', async e => {
@@ -3623,7 +3684,7 @@
         '<div class="pm-info"><strong>'+escapeHtml(m.display_name||'')+'</strong><span>'+escapeHtml(m.email)+'</span></div>'+
         '<div style="display:flex; align-items:center; gap:8px">'+
           '<span class="org-badge">'+(m.role === 'admin' ? t('role_admin') : t('role_member'))+'</span>'+
-          (canRemove ? '<button class="btn" data-remove-m="'+m.id+'" style="color:var(--danger); padding:4px 10px" title="'+t('remove_member')+'">🗑</button>' : '')+
+          (canRemove ? '<button class="btn" data-remove-m="'+m.id+'" style="color:var(--danger); padding:4px 10px" title="'+t('remove_member')+'"></button>' : '')+
         '</div>'+
       '</div>';
     }).join('') || '<div class="empty">—</div>';
@@ -3640,7 +3701,7 @@
       try {
         const { error } = await supa.from('members').delete().eq('id', mid);
         if(error) throw error;
-        toast(state.lang === 'en' ? '✓ Member removed' : '✓ 已移除成員', 'success');
+        toast(state.lang === 'en' ? 'Member removed' : '已移除成員', 'success');
         await renderMembers();
       } catch(err){
         alert((state.lang === 'en' ? 'Failed: ' : '失敗：') + err.message);
@@ -3713,10 +3774,10 @@
       await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_INVITE, params);
 
       resultEl.style.color = 'var(--accent)';
-      resultEl.innerHTML = '✓ ' + (state.lang === 'en'
+      resultEl.innerHTML = '' + (state.lang === 'en'
         ? 'Invitation sent to ' + email + '. After they register, approve them in "Pending Members".'
         : '邀請信已自動寄出至 ' + email + '。對方註冊後請至「待審核成員」核准。');
-      toast(state.lang === 'en' ? '✓ Invitation sent!' : '✓ 邀請信已寄出', 'success');
+      toast(state.lang === 'en' ? 'Invitation sent!' : '邀請信已寄出', 'success');
       $('invite-email').value = '';
       $('invite-name').value = '';
     } catch(e){
@@ -3731,7 +3792,7 @@
         : '您好 ' + name + '，\n\n請透過此連結註冊：\n' + inviteLink + '\n\n請使用此 Email：' + email;
       const errMsg = e.text || e.message || 'Unknown';
       resultEl.style.color = 'var(--danger)';
-      resultEl.innerHTML = '⚠ ' + (state.lang === 'en'
+      resultEl.innerHTML = '' + (state.lang === 'en'
         ? 'Auto-send failed (' + escapeHtml(errMsg) + '). Falling back to manual email.'
         : '自動寄信失敗（' + escapeHtml(errMsg) + '），改用本機郵件草稿。');
       setTimeout(() => {
@@ -4034,7 +4095,22 @@
   const newSaveBtn = _origSaveBtn.cloneNode(true);
   _origSaveBtn.replaceWith(newSaveBtn);
   newSaveBtn.addEventListener('click', async () => {
+    // If quote number is still a placeholder (contains ?????), compute the real one
+    const qnEl = $('quote-no');
+    if(qnEl.value.includes('?????') && currentOrg){
+      const seq = await computeNextDailySeq();
+      const realNo = formatQuoteNo(currentOrg.org_code, $('quote-date').value || todayStr(0), seq);
+      qnEl.value = realNo;
+      // Store seq for cloud push (needed by pushQuoteToCloud to fill daily_seq column)
+      window._pendingDailySeq = seq;
+    }
+
     const s = snapshot();
+    // Inject daily_seq into snapshot if we just computed it
+    if(window._pendingDailySeq){
+      s.dailySeq = window._pendingDailySeq;
+      delete window._pendingDailySeq;
+    }
     const arr = loadQuotes();
     const i = arr.findIndex(x => x.id === s.id);
     const isUpdate = i >= 0;
@@ -4055,8 +4131,8 @@
     // Auto-backup snapshot to localStorage (safety net)
     autoBackup('after-save');
     const msg = state.lang === 'en'
-      ? (isUpdate ? '✓ Quote updated' : '✓ Saved')
-      : (isUpdate ? '✓ 已更新報價單' : '✓ 已儲存');
+      ? (isUpdate ? 'Quote updated' : 'Saved as ' + qnEl.value)
+      : (isUpdate ? '已更新報價單' : '已儲存：' + qnEl.value);
     toast(msg, 'success');
   });
 
