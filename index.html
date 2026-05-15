@@ -2166,30 +2166,46 @@
   // Compute next daily sequence for this org by querying cloud (with local fallback)
   async function computeNextDailySeq(){
     const today = todayStr(0); // YYYY-MM-DD
-    if(!currentMember){
-      // Offline: count from local cache
-      const arr = loadQuotes();
-      const todays = arr.filter(q => (q.quoteDate || '').slice(0,10) === today);
-      return todays.length + 1;
+    const orgCode = currentOrg && currentOrg.org_code ? String(currentOrg.org_code).padStart(5,'0') : null;
+
+    // Strategy: parse all existing quote numbers (local + cloud), find the max seq for today.
+    // Local is authoritative — cloud push is fire-and-forget so it might lag behind.
+    // We also peek at cloud to handle multi-device case.
+
+    function maxSeqFromArray(arr){
+      if(!arr || !arr.length || !orgCode) return 0;
+      let max = 0;
+      const todayStripped = today.replace(/-/g,'');
+      arr.forEach(q => {
+        const qn = (q.quoteNo || q.quote_no || '').trim();
+        if(!qn) return;
+        // Format: Q-YYYYMMDD-XXXXX-NNNNN
+        const m = qn.match(/^Q-(\d{8})-(\d{5})-(\d{5})$/);
+        if(!m) return;
+        const [_, dateStr, codeStr, seqStr] = m;
+        if(dateStr === todayStripped && codeStr === orgCode){
+          const n = parseInt(seqStr, 10);
+          if(n > max) max = n;
+        }
+      });
+      return max;
     }
-    try {
-      // Ask cloud for max daily_seq today
-      const { data, error } = await supa
-        .from('quotes')
-        .select('daily_seq')
-        .eq('org_id', currentMember.org_id)
-        .eq('quote_date', today)
-        .order('daily_seq', { ascending: false })
-        .limit(1);
-      if(error) throw error;
-      if(!data || data.length === 0) return 1;
-      return (data[0].daily_seq || 0) + 1;
-    } catch(e){
-      console.warn('computeNextDailySeq fallback to local:', e);
-      const arr = loadQuotes();
-      const todays = arr.filter(q => (q.quoteDate || '').slice(0,10) === today);
-      return todays.length + 1;
+
+    const localMax = maxSeqFromArray(loadQuotes());
+    let cloudMax = 0;
+    if(currentMember){
+      try {
+        const { data } = await supa
+          .from('quotes')
+          .select('quote_no')
+          .eq('org_id', currentMember.org_id)
+          .eq('quote_date', today);
+        cloudMax = maxSeqFromArray(data || []);
+      } catch(e){
+        console.warn('computeNextDailySeq cloud query failed; using local only', e);
+      }
     }
+    return Math.max(localMax, cloudMax) + 1;
   }
 
   function formatQuoteNo(orgCode, dateStr, seq){
@@ -3199,29 +3215,7 @@
   $('add-row').addEventListener('click', () => { state.items.push({desc:'',qty:1,price:0}); renderItems(); });
   ['disc-type','disc-val','tax-rate','currency'].forEach(id => $(id).addEventListener('input', recalc));
   $('currency').addEventListener('change', recalc);
-  $('btn-save').addEventListener('click', () => {
-    const s = snapshot();
-    const arr = loadQuotes();
-    const i = arr.findIndex(x => x.id === s.id);
-    const isUpdate = i >= 0;
-    if(isUpdate) arr[i] = s; else arr.push(s);
-    const ok = saveQuotes(arr);
-    // Auto-save client to address book
-    const c = getClientFromForm();
-    if(c.name){
-      const cArr = loadClients();
-      const idx = cArr.findIndex(x => x.name === c.name);
-      c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
-      if(idx >= 0) cArr[idx] = c; else cArr.push(c);
-      saveClients(cArr);
-    }
-    if(ok !== false){
-      const msg = state.lang === 'en'
-        ? (isUpdate ? 'Quote updated' : 'Saved to history')
-        : (isUpdate ? '已更新報價單' : '已儲存至歷史');
-      toast(msg, 'success');
-    }
-  });
+  // btn-save handler is wired below in the cloud-save section (single source of truth)
   $('btn-new').addEventListener('click', newQuote);
   // duplicate 功能已移除（如要保留留作 reference）
   $('btn-print').addEventListener('click', () => window.print());
@@ -3230,7 +3224,7 @@
 
   // Client/Product wiring
   $('pick-client').addEventListener('click', () => openPicker('client'));
-  $('save-client').addEventListener('click', saveCurrentClient);
+  // save-client handler wired below
   $('pick-product').addEventListener('click', () => openPicker('product'));
   $('btn-add-client').addEventListener('click', () => openClientEditor(null));
   $('btn-add-product').addEventListener('click', () => openProductEditor(null));
@@ -4451,59 +4445,66 @@
     // Push the latest to cloud (assume latest update is the last item OR caller pushes manually)
   };
 
-  // Patch the save button to also push to cloud
-  // (We re-wire btn-save below)
-  // The existing handler already calls saveQuotes; we add cloud push:
-  const _origSaveBtn = $('btn-save');
-  // Already bound; replace by cloning to remove all listeners
-  const newSaveBtn = _origSaveBtn.cloneNode(true);
-  _origSaveBtn.replaceWith(newSaveBtn);
-  newSaveBtn.addEventListener('click', async () => {
-    // If quote number is empty (new quote, never saved), compute it now
-    const qnEl = $('quote-no');
-    if(!qnEl.value.trim() && currentOrg){
-      const seq = await computeNextDailySeq();
-      const realNo = formatQuoteNo(currentOrg.org_code, $('quote-date').value || todayStr(0), seq);
-      qnEl.value = realNo;
-      window._pendingDailySeq = seq;
-    }
+  // Save button — single source of truth, no cloning
+  $('btn-save').addEventListener('click', async () => {
+    const btn = $('btn-save');
+    if(btn.disabled) return;
+    btn.disabled = true;
+    try {
+      // If quote number is empty (new quote, never saved), compute it now
+      const qnEl = $('quote-no');
+      if(!qnEl.value.trim()){
+        if(!currentOrg || !currentOrg.org_code){
+          alert(state.lang === 'en'
+            ? 'Organization not loaded yet. Please wait a moment and retry.'
+            : '組織資料尚未載入，請稍候再試');
+          return;
+        }
+        const seq = await computeNextDailySeq();
+        const realNo = formatQuoteNo(currentOrg.org_code, $('quote-date').value || todayStr(0), seq);
+        qnEl.value = realNo;
+        window._pendingDailySeq = seq;
+      }
 
-    const s = snapshot();
-    // Inject daily_seq into snapshot if we just computed it
-    if(window._pendingDailySeq){
-      s.dailySeq = window._pendingDailySeq;
-      delete window._pendingDailySeq;
+      const s = snapshot();
+      if(window._pendingDailySeq){
+        s.dailySeq = window._pendingDailySeq;
+        delete window._pendingDailySeq;
+      }
+      const arr = loadQuotes();
+      const i = arr.findIndex(x => x.id === s.id);
+      const isUpdate = i >= 0;
+      if(isUpdate) arr[i] = s; else arr.push(s);
+      _saveQuotesLocal(arr);
+      // Cloud push (fire-and-forget — local already saved)
+      pushQuoteToCloud(s).catch(e => console.warn('cloud push failed but local saved', e));
+      // Auto-save client
+      const c = getClientFromForm();
+      if(c.name){
+        const cArr = loadClients();
+        const idx = cArr.findIndex(x => x.name === c.name);
+        c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
+        if(idx >= 0) cArr[idx] = c; else cArr.push(c);
+        saveClients(cArr);
+        pushClientToCloud(c).catch(e => console.warn('client push failed', e));
+      }
+      // Auto-backup snapshot to localStorage
+      autoBackup('after-save');
+      const msg = state.lang === 'en'
+        ? (isUpdate ? 'Quote updated' : 'Saved as ' + qnEl.value)
+        : (isUpdate ? '已更新報價單' : '已儲存：' + qnEl.value);
+      toast(msg, 'success');
+    } catch(err){
+      console.error('Save error:', err);
+      alert((state.lang === 'en' ? 'Save failed: ' : '儲存失敗：') + (err.message || err));
+    } finally {
+      btn.disabled = false;
     }
-    const arr = loadQuotes();
-    const i = arr.findIndex(x => x.id === s.id);
-    const isUpdate = i >= 0;
-    if(isUpdate) arr[i] = s; else arr.push(s);
-    _saveQuotesLocal(arr);
-    // Cloud push (won't block UI even if it fails — we have local + autoBackup)
-    pushQuoteToCloud(s).catch(e => console.warn('cloud push failed but local saved', e));
-    // Auto-save client
-    const c = getClientFromForm();
-    if(c.name){
-      const cArr = loadClients();
-      const idx = cArr.findIndex(x => x.name === c.name);
-      c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
-      if(idx >= 0) cArr[idx] = c; else cArr.push(c);
-      saveClients(cArr);
-      pushClientToCloud(c).catch(e => console.warn('client push failed', e));
-    }
-    // Auto-backup snapshot to localStorage (safety net)
-    autoBackup('after-save');
-    const msg = state.lang === 'en'
-      ? (isUpdate ? 'Quote updated' : 'Saved as ' + qnEl.value)
-      : (isUpdate ? '已更新報價單' : '已儲存：' + qnEl.value);
-    toast(msg, 'success');
   });
 
   // Patch saveCurrentClient
-  const _origSaveClientBtn = $('save-client');
-  const newSaveClientBtn = _origSaveClientBtn.cloneNode(true);
-  _origSaveClientBtn.replaceWith(newSaveClientBtn);
-  newSaveClientBtn.addEventListener('click', async () => {
+  // save-client — direct binding
+  $('save-client').addEventListener('click', async () => {
     const c = getClientFromForm();
     if(!c.name){ alert(state.lang==='en'?'Client name is required':'請先填寫客戶名稱'); return; }
     const arr = loadClients();
@@ -4511,7 +4512,7 @@
     c.id = (i >= 0 && arr[i].id) ? arr[i].id : uid();
     if(i >= 0) arr[i] = c; else arr.push(c);
     saveClients(arr);
-    await pushClientToCloud(c);
+    pushClientToCloud(c).catch(e => console.warn('client push failed', e));
     toast(t('saved_client'), 'success');
   });
 
