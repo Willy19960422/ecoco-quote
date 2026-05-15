@@ -180,6 +180,8 @@
     position: relative;
   }
   .logo-slot:hover { border-color: var(--accent); }
+  .logo-slot-readonly { cursor: default !important; }
+  .logo-slot-readonly:hover { border-color: var(--border) !important; }
   .logo-slot img { width: 100%; height: 100%; object-fit: contain; }
   .logo-slot .placeholder {
     color: var(--text-3); font-size: 11px;
@@ -1003,16 +1005,14 @@
     <!-- Meta -->
     <div class="card">
       <div class="meta-row">
-        <label class="logo-slot" id="logo-slot">
-          <span class="placeholder" id="logo-placeholder" data-i18n="upload_logo">上傳 Logo</span>
+        <div class="logo-slot logo-slot-readonly" id="logo-slot" title="Logo 由管理員於「基本資料」設定">
+          <span class="placeholder" id="logo-placeholder" data-i18n="no_logo">尚未設定 Logo</span>
           <img id="logo-img" style="display:none" alt="logo" />
-          <input type="file" id="logo-input" accept="image/*" style="display:none" />
-          <button type="button" class="logo-remove" id="logo-remove" title="Remove">×</button>
-        </label>
+        </div>
         <div class="grid-4">
           <div class="field">
             <label data-i18n="quote_no">報價單編號</label>
-            <input type="text" id="quote-no" />
+            <input type="text" id="quote-no" data-i18n-ph="quote_no_hint" placeholder="儲存後自動產生" />
           </div>
           <div class="field">
             <label data-i18n="quote_date">日期</label>
@@ -1240,6 +1240,27 @@
     <div class="card">
       <p class="section-title"><span class="dot"></span><span data-i18n="org_title">組織資料</span></p>
       <p style="font-size:12px; color:var(--text-2); margin:0 0 16px" data-i18n="org_desc">這裡的資料會自動帶入每張新報價單的「寄件方」欄位。</p>
+
+      <!-- Logo upload (admin only) -->
+      <div id="org-logo-section" style="display:flex; gap:18px; align-items:center; padding:14px; background:var(--surface-2); border-radius:var(--radius); margin-bottom:16px">
+        <div style="position:relative">
+          <div class="logo-slot" id="org-logo-slot" style="width:96px; height:96px">
+            <span class="placeholder" id="org-logo-placeholder" data-i18n="no_logo">尚未設定 Logo</span>
+            <img id="org-logo-img" style="display:none" alt="logo" />
+            <input type="file" id="org-logo-input" accept="image/png,image/jpeg,image/webp" style="display:none" />
+            <button type="button" class="logo-remove" id="org-logo-remove" title="移除 Logo">×</button>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div style="font-weight:600; margin-bottom:4px" data-i18n="org_logo_title">公司 Logo</div>
+          <div style="font-size:12px; color:var(--text-2); margin-bottom:8px" data-i18n="org_logo_desc">點擊左側方框上傳，所有成員與報價單將自動使用此 Logo。檔案大小限制 2 MB，建議使用 PNG 透明背景。</div>
+          <div id="org-logo-status" style="font-size:12px; color:var(--text-3)"></div>
+        </div>
+      </div>
+      <!-- Member view: read-only notice -->
+      <div id="org-logo-readonly-note" style="display:none; font-size:12px; color:var(--text-2); margin-bottom:16px; padding:10px 14px; background:var(--surface-2); border-radius:var(--radius)">
+        <span data-i18n="logo_member_note">公司 Logo 由管理員設定，所有成員會自動套用</span>
+      </div>
 
       <div style="display:flex; flex-direction:column; gap:12px">
         <div class="grid-2" style="gap:12px">
@@ -1512,8 +1533,11 @@
   const i18n = {
     zh: {
       quotation_tool: '報價單工具', tab_editor: '編輯', tab_history: '歷史',
-      upload_logo: '上傳 Logo',
-      quote_no: '報價單編號', quote_date: '日期', valid_until: '有效期至', currency: '貨幣',
+      upload_logo: '上傳 Logo', no_logo: '尚未設定 Logo',
+      org_logo_title: '公司 Logo',
+      org_logo_desc: '點擊左側方框上傳，所有成員與報價單將自動使用此 Logo。檔案大小限制 2 MB，建議使用 PNG 透明背景。',
+      logo_member_note: '公司 Logo 由管理員設定，所有成員會自動套用',
+      quote_no: '報價單編號', quote_no_hint: '儲存後自動產生', quote_date: '日期', valid_until: '有效期至', currency: '貨幣',
       from: '寄件方', to: '客戶',
       company_name: '公司名稱', client_name: '客戶名稱',
       org_system_code: '系統代號（報價單編號使用）',
@@ -1650,8 +1674,11 @@
     },
     en: {
       quotation_tool: 'Quotation Tool', tab_editor: 'Editor', tab_history: 'History',
-      upload_logo: 'Upload Logo',
-      quote_no: 'Quote No.', quote_date: 'Date', valid_until: 'Valid Until', currency: 'Currency',
+      upload_logo: 'Upload Logo', no_logo: 'No logo set',
+      org_logo_title: 'Company Logo',
+      org_logo_desc: 'Click the box on the left to upload. All members and quotations will use this logo. Max file size 2 MB, PNG with transparent background recommended.',
+      logo_member_note: 'Company logo is set by admin; all members will use it automatically',
+      quote_no: 'Quote No.', quote_no_hint: 'Auto-generated on save', quote_date: 'Date', valid_until: 'Valid Until', currency: 'Currency',
       from: 'From', to: 'Bill To',
       company_name: 'Company', client_name: 'Client',
       org_system_code: 'System Code (used in quote number)',
@@ -2088,12 +2115,9 @@
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
   function todayStr(off){ const d = new Date(); d.setDate(d.getDate()+(off||0)); return d.toISOString().slice(0,10); }
   // Quote number is generated when saving (uses org_code + daily sequence).
-  // This function returns a *placeholder* showing the format so users see something in the field.
+  // For new quotes, leave the field empty until saved.
   function genQuoteNo(){
-    const d = new Date();
-    const ymd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
-    const orgCode = (currentOrg && currentOrg.org_code) ? String(currentOrg.org_code).padStart(5,'0') : '00000';
-    return 'Q-' + ymd + '-' + orgCode + '-?????';  // ????? = will be filled on save
+    return '';  // Empty until first save
   }
 
   // Compute next daily sequence for this org by querying cloud (with local fallback)
@@ -2364,7 +2388,25 @@
     const node = buildPdfNode();
     document.body.appendChild(node);
     try {
-      const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      // Wait for all images (especially Logo from Supabase Storage) to fully load
+      // Otherwise html2canvas may snapshot before image fetched → blank logo
+      const images = node.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if(img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          // Safety timeout: don't block PDF for >3 seconds per image
+          setTimeout(() => resolve(), 3000);
+        });
+      }));
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        allowTaint: false,
+        logging: false
+      });
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -2427,7 +2469,10 @@
     const calc = recalc();
     const sym = curSym();
     const n = document.createElement('div');
-    const logo = $('logo-img').src && $('logo-img').style.display !== 'none' ? $('logo-img').src : '';
+    // Prefer cloud logo (organization-shared); fall back to local img element
+    const logo = (currentOrg && currentOrg.logo_url)
+      ? currentOrg.logo_url
+      : ($('logo-img').src && $('logo-img').style.display !== 'none' ? $('logo-img').src : '');
     n.style.cssText = 'position:fixed; left:-99999px; top:0; width:794px; padding:48px 56px; background:white; font-family:"Noto Sans TC","Inter",sans-serif; color:#1a1a1a; font-size:13px; line-height:1.6;';
 
     const fromBlock = [
@@ -2463,7 +2508,7 @@
     n.innerHTML =
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; border-bottom:2px solid #1a1a1a; padding-bottom:20px">'+
         '<div style="display:flex; align-items:center; gap:16px">'+
-          (logo ? '<img src="'+logo+'" style="width:64px; height:64px; object-fit:contain" />' : '')+
+          (logo ? '<img src="'+logo+'" crossorigin="anonymous" style="width:64px; height:64px; object-fit:contain" />' : '')+
           '<div>'+
             '<div style="font-size:26px; font-weight:600; letter-spacing:1px">'+escapeHtml(headerName)+'</div>'+
             '<div style="font-size:12px; color:#666; margin-top:2px">'+t('quotation_tool')+'</div>'+
@@ -2520,34 +2565,164 @@
   }
 
   // --- Logo upload ---
-  $('logo-slot').addEventListener('click', e => {
-    if(e.target.id === 'logo-remove') return;
-    $('logo-input').click();
+  // Logo strict size limit (avoid quota issues)
+  const LOGO_MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB raw
+  const LOGO_COMPRESS_DIM = 256;               // resize to 256px max
+  const LOGO_COMPRESSED_MAX_BYTES = 200 * 1024; // 200 KB after compression (sanity check)
+
+  // Org logo slot click → open file picker (admin only)
+  $('org-logo-slot').addEventListener('click', e => {
+    if(e.target.id === 'org-logo-remove') return;
+    if(!currentMember || currentMember.role !== 'admin'){
+      alert(state.lang === 'en' ? 'Only admin can change company logo' : '僅管理員可變更公司 Logo');
+      return;
+    }
+    $('org-logo-input').click();
   });
-  $('logo-input').addEventListener('change', e => {
+
+  $('org-logo-input').addEventListener('change', e => {
     const f = e.target.files[0]; if(!f) return;
+    if(!currentMember || currentMember.role !== 'admin'){
+      alert(state.lang === 'en' ? 'Only admin can change company logo' : '僅管理員可變更公司 Logo');
+      e.target.value = '';
+      return;
+    }
     if(!f.type.startsWith('image/')){
       alert(state.lang === 'en' ? 'Please select an image file' : '請選擇圖片檔案');
       return;
     }
-    if(f.size > 5 * 1024 * 1024){
-      alert(state.lang === 'en' ? 'Image too large (max 5MB)' : '圖片過大（上限 5MB）');
+    if(f.size > LOGO_MAX_FILE_BYTES){
+      const mb = (f.size / 1024 / 1024).toFixed(2);
+      alert(state.lang === 'en'
+        ? 'File too large (' + mb + ' MB). Max 2 MB allowed.'
+        : '檔案過大（' + mb + ' MB），最大限制 2 MB');
+      e.target.value = '';
       return;
     }
+    $('org-logo-status').textContent = state.lang === 'en' ? 'Processing...' : '處理中...';
     const r = new FileReader();
     r.onload = ev => {
-      // If image is large, compress via canvas to stay under localStorage quota
       const dataUrl = ev.target.result;
-      if(dataUrl.length > 500 * 1024){
-        compressImage(dataUrl, 256, compressed => {
-          saveLogo(compressed); showLogo(compressed);
-        });
-      } else {
-        saveLogo(dataUrl); showLogo(dataUrl);
-      }
+      compressImage(dataUrl, LOGO_COMPRESS_DIM, async compressed => {
+        // Verify compressed size
+        if(compressed.length > LOGO_COMPRESSED_MAX_BYTES * 1.4){  // base64 overhead
+          // Try stronger compression
+          compressImage(dataUrl, 200, async harder => {
+            await doUploadOrgLogo(harder);
+          });
+        } else {
+          await doUploadOrgLogo(compressed);
+        }
+      });
     };
     r.readAsDataURL(f);
+    e.target.value = '';
   });
+
+  async function doUploadOrgLogo(compressedDataUrl){
+    // Show immediately (optimistic)
+    showOrgLogo(compressedDataUrl);
+    showLogo(compressedDataUrl);  // also reflect in editor preview
+    saveLogo(compressedDataUrl);  // local cache as fallback
+    $('org-logo-status').textContent = state.lang === 'en' ? 'Uploading to cloud...' : '上傳至雲端...';
+    try {
+      // 1. Delete old logo file (if any) to avoid storage accumulation
+      if(currentOrg && currentOrg.logo_url){
+        try {
+          const oldPath = extractStoragePath(currentOrg.logo_url, 'logos');
+          if(oldPath) await supa.storage.from('logos').remove([oldPath]);
+        } catch(e){ /* ignore old-delete errors */ }
+      }
+      // 2. Upload new logo
+      const cloudUrl = await uploadLogoToStorage(compressedDataUrl);
+      if(!cloudUrl) throw new Error('upload returned no url');
+      // 3. Update org record
+      const { error } = await supa.from('organizations')
+        .update({ logo_url: cloudUrl })
+        .eq('id', currentMember.org_id);
+      if(error) throw error;
+      currentOrg.logo_url = cloudUrl;
+      showOrgLogo(cloudUrl);
+      showLogo(cloudUrl);
+      saveLogo(cloudUrl);
+      $('org-logo-status').textContent = '';
+      toast(state.lang === 'en' ? 'Logo saved' : 'Logo 已儲存', 'success');
+    } catch(err){
+      console.warn('Logo cloud upload failed:', err);
+      $('org-logo-status').textContent = state.lang === 'en'
+        ? 'Cloud save failed: ' + (err.message || '')
+        : '雲端儲存失敗：' + (err.message || '');
+      toast(state.lang === 'en'
+        ? 'Cloud save failed; logo kept on this device only'
+        : '雲端儲存失敗，Logo 僅在本機顯示', 'error');
+    }
+  }
+
+  // Extract path inside a Supabase Storage bucket from its public URL
+  function extractStoragePath(publicUrl, bucketName){
+    if(!publicUrl) return null;
+    const marker = '/storage/v1/object/public/' + bucketName + '/';
+    const idx = publicUrl.indexOf(marker);
+    if(idx === -1) return null;
+    return decodeURIComponent(publicUrl.substring(idx + marker.length));
+  }
+
+  $('org-logo-remove').addEventListener('click', async e => {
+    e.stopPropagation();
+    if(!currentMember || currentMember.role !== 'admin') return;
+    if(!confirm(state.lang === 'en' ? 'Remove company logo?' : '確定移除公司 Logo？')) return;
+    // Optimistic UI
+    clearLogo();
+    $('org-logo-img').src = ''; $('org-logo-img').style.display = 'none';
+    $('org-logo-placeholder').style.display = '';
+    $('org-logo-slot').classList.remove('has-image');
+    // Reflect in editor preview too
+    $('logo-img').src = ''; $('logo-img').style.display = 'none';
+    $('logo-placeholder').style.display = '';
+    $('logo-slot').classList.remove('has-image');
+    // Remove from cloud
+    if(currentOrg && currentOrg.logo_url){
+      try {
+        const oldPath = extractStoragePath(currentOrg.logo_url, 'logos');
+        if(oldPath) await supa.storage.from('logos').remove([oldPath]);
+        await supa.from('organizations').update({ logo_url: null }).eq('id', currentMember.org_id);
+        currentOrg.logo_url = null;
+        toast(state.lang === 'en' ? 'Logo removed' : 'Logo 已移除', 'success');
+      } catch(err){
+        console.warn('Failed to clear cloud logo:', err);
+        toast(state.lang === 'en' ? 'Cloud remove failed' : '雲端移除失敗', 'error');
+      }
+    }
+  });
+
+  function showOrgLogo(data){
+    $('org-logo-img').src = data;
+    $('org-logo-img').style.display = 'block';
+    $('org-logo-placeholder').style.display = 'none';
+    $('org-logo-slot').classList.add('has-image');
+  }
+
+  // Upload base64/dataUrl Logo image to Supabase Storage
+  async function uploadLogoToStorage(dataUrl){
+    if(!currentMember) return null;
+    // Convert data URL to Blob
+    const matches = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+    if(!matches) return null;
+    const mime = matches[1];
+    const ext = (mime.split('/')[1] || 'png').replace('jpeg','jpg');
+    const binary = atob(matches[2]);
+    const arr = new Uint8Array(binary.length);
+    for(let i=0; i<binary.length; i++) arr[i] = binary.charCodeAt(i);
+    const blob = new Blob([arr], { type: mime });
+    const path = currentMember.org_id + '/logo-' + Date.now() + '.' + ext;
+    const { data, error } = await supa.storage.from('logos').upload(path, blob, {
+      contentType: mime,
+      upsert: false
+    });
+    if(error) throw error;
+    const { data: urlData } = supa.storage.from('logos').getPublicUrl(data.path);
+    return urlData.publicUrl;
+  }
 
   function compressImage(dataUrl, maxDim, cb){
     const img = new Image();
@@ -2567,15 +2742,6 @@
     img.onerror = () => cb(dataUrl);
     img.src = dataUrl;
   }
-  $('logo-remove').addEventListener('click', e => {
-    e.stopPropagation();
-    clearLogo();
-    $('logo-img').src = '';
-    $('logo-img').style.display = 'none';
-    $('logo-placeholder').style.display = '';
-    $('logo-slot').classList.remove('has-image');
-    $('logo-input').value = '';
-  });
   function showLogo(data){
     $('logo-img').src = data;
     $('logo-img').style.display = 'block';
@@ -3504,6 +3670,16 @@
     // Show app
     showApp();
 
+    // Load organization logo (from cloud, falls back to local cache)
+    if(currentOrg && currentOrg.logo_url){
+      showLogo(currentOrg.logo_url);
+      saveLogo(currentOrg.logo_url);  // refresh local cache
+    } else {
+      // No cloud logo. Check local cache (e.g. user uploaded but cloud upload failed earlier)
+      const cached = loadLogo();
+      if(cached) showLogo(cached);
+    }
+
     // First-time hint: pulse the user-bar so people notice it's clickable
     const hintKey = 'ecoco_user_bar_hint_seen_' + user.id;
     if(!safeGet(hintKey)){
@@ -3587,6 +3763,21 @@
     $('org-address').value = currentOrg.address || '';
     $('org-phone').value = currentOrg.phone || '';
     $('org-email').value = currentOrg.email || '';
+
+    // Logo: admin sees editable section, member sees readonly note
+    const isAdmin = currentMember && currentMember.role === 'admin';
+    $('org-logo-section').style.display = isAdmin ? '' : 'none';
+    $('org-logo-readonly-note').style.display = isAdmin ? 'none' : '';
+    // Display logo (both admin & member)
+    if(currentOrg.logo_url){
+      showOrgLogo(currentOrg.logo_url);
+    } else {
+      $('org-logo-img').src = '';
+      $('org-logo-img').style.display = 'none';
+      $('org-logo-placeholder').style.display = '';
+      $('org-logo-slot').classList.remove('has-image');
+    }
+    $('org-logo-status').textContent = '';
   }
 
   async function saveOrgSettings(){
@@ -4095,13 +4286,12 @@
   const newSaveBtn = _origSaveBtn.cloneNode(true);
   _origSaveBtn.replaceWith(newSaveBtn);
   newSaveBtn.addEventListener('click', async () => {
-    // If quote number is still a placeholder (contains ?????), compute the real one
+    // If quote number is empty (new quote, never saved), compute it now
     const qnEl = $('quote-no');
-    if(qnEl.value.includes('?????') && currentOrg){
+    if(!qnEl.value.trim() && currentOrg){
       const seq = await computeNextDailySeq();
       const realNo = formatQuoteNo(currentOrg.org_code, $('quote-date').value || todayStr(0), seq);
       qnEl.value = realNo;
-      // Store seq for cloud push (needed by pushQuoteToCloud to fill daily_seq column)
       window._pendingDailySeq = seq;
     }
 
