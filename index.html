@@ -1082,8 +1082,8 @@
               <label data-i18n="client_name">客戶名稱</label>
               <div style="display:flex; gap:6px">
                 <input type="text" id="to-name" autocomplete="organization" style="flex:1" />
-                <button type="button" class="btn" id="pick-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="從客戶簿選取"></button>
-                <button type="button" class="btn" id="save-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="儲存此客戶"></button>
+                <button type="button" class="btn" id="pick-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="從客戶簿選取"><span data-i18n="pick_from_book">選取</span></button>
+                <button type="button" class="btn" id="save-client" style="padding:6px 10px; font-size:12px; flex-shrink:0" title="儲存此客戶到客戶簿"><span data-i18n="save_to_book">存入</span></button>
               </div>
             </div>
             <div class="field">
@@ -1549,6 +1549,7 @@
       save: '儲存', new: '新報價單', print: '列印', pdf: '匯出 PDF',
       history_title: '歷史報價', no_history: '尚無儲存的報價單',
       load: '載入', delete: '刪除',
+      pick_from_book: '選取', save_to_book: '存入',
       saved: '已儲存', deleted: '已刪除', loaded: '已載入',
       contact_ph: '負責此報價的聯絡人',
       notes_ph: '付款條件、交貨方式、保固、其他備註...',
@@ -1690,6 +1691,7 @@
       save: 'Save', new: 'New', print: 'Print', pdf: 'Export PDF',
       history_title: 'Saved Quotations', no_history: 'No saved quotations yet',
       load: 'Load', delete: 'Delete',
+      pick_from_book: 'Pick', save_to_book: 'Save',
       saved: 'Saved', deleted: 'Deleted', loaded: 'Loaded',
       contact_ph: 'Person who issued this quote',
       notes_ph: 'Payment terms, delivery, warranty, remarks...',
@@ -2353,8 +2355,8 @@
           '<span>'+(q.savedAt||'').slice(0,10)+' · '+totalStr+'</span>'+
         '</div>'+
         '<div class="history-actions">'+
-          '<button class="btn" data-load="'+escapeHtml(q.id)+'">↗ '+t('load')+'</button>'+
-          '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)"></button>'+
+          '<button class="btn" data-load="'+escapeHtml(q.id)+'">'+t('load')+'</button>'+
+          '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">'+t('delete')+'</button>'+
         '</div>';
       list.appendChild(div);
     });
@@ -2901,9 +2903,9 @@
           '<span>'+escapeHtml([c.contact, c.email, c.phone].filter(Boolean).join(' · '))+'</span>'+
         '</div>'+
         '<div class="history-actions">'+
-          '<button class="btn" data-use="'+c.id+'">↗ '+t('load')+'</button>'+
-          '<button class="btn" data-edit-c="'+c.id+'"></button>'+
-          '<button class="btn" data-del-c="'+c.id+'" style="color:var(--danger)"></button>'+
+          '<button class="btn" data-use="'+c.id+'">'+t('load')+'</button>'+
+          '<button class="btn" data-edit-c="'+c.id+'">'+t('edit')+'</button>'+
+          '<button class="btn" data-del-c="'+c.id+'" style="color:var(--danger)">'+t('delete')+'</button>'+
         '</div>';
       list.appendChild(div);
     });
@@ -2937,8 +2939,8 @@
           '<span>'+curSym()+' '+fmt(p.price||0)+'</span>'+
         '</div>'+
         '<div class="history-actions">'+
-          '<button class="btn" data-edit-p="'+p.id+'"></button>'+
-          '<button class="btn" data-del-p="'+p.id+'" style="color:var(--danger)"></button>'+
+          '<button class="btn" data-edit-p="'+p.id+'">'+t('edit')+'</button>'+
+          '<button class="btn" data-del-p="'+p.id+'" style="color:var(--danger)">'+t('delete')+'</button>'+
         '</div>';
       list.appendChild(div);
     });
@@ -3875,7 +3877,7 @@
         '<div class="pm-info"><strong>'+escapeHtml(m.display_name||'')+'</strong><span>'+escapeHtml(m.email)+'</span></div>'+
         '<div style="display:flex; align-items:center; gap:8px">'+
           '<span class="org-badge">'+(m.role === 'admin' ? t('role_admin') : t('role_member'))+'</span>'+
-          (canRemove ? '<button class="btn" data-remove-m="'+m.id+'" style="color:var(--danger); padding:4px 10px" title="'+t('remove_member')+'"></button>' : '')+
+          (canRemove ? '<button class="btn" data-remove-m="'+m.id+'" style="color:var(--danger); padding:4px 10px" title="'+t('remove_member')+'">'+t('remove_member')+'</button>' : '')+
         '</div>'+
       '</div>';
     }).join('') || '<div class="empty">—</div>';
