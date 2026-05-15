@@ -1300,19 +1300,46 @@
   <div id="tab-members" style="display:none">
     <div class="card">
       <p class="section-title"><span class="dot" style="background:var(--accent)"></span><span data-i18n="invite_member">新增成員</span></p>
-      <p style="font-size:12px; color:var(--text-2); margin:0 0 12px" data-i18n="invite_desc">由管理員為新員工建立帳號。新員工會收到 Email，點連結後設定密碼即可登入，自動加入此組織且無需審核。</p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
-        <div class="field" style="flex:2; min-width:160px">
-          <label data-i18n="new_member_email">新成員 Email</label>
-          <input type="email" id="invite-email" placeholder="someone@example.com" inputmode="email" />
-        </div>
-        <div class="field" style="flex:1; min-width:120px">
-          <label data-i18n="new_member_name">姓名</label>
-          <input type="text" id="invite-name" />
-        </div>
-        <button class="btn primary" id="btn-invite" style="height:42px"><span data-i18n="send_invite">寄出邀請</span></button>
+
+      <!-- Mode tabs -->
+      <div style="display:flex; gap:6px; margin-bottom:14px; border-bottom:1px solid var(--border)">
+        <button class="auth-tab active" id="add-mode-direct" data-add-mode="direct" data-i18n="add_mode_direct">直接建立帳號</button>
+        <button class="auth-tab" id="add-mode-invite" data-add-mode="invite" data-i18n="add_mode_invite">寄出邀請信</button>
       </div>
-      <p id="invite-result" style="font-size:12px; margin:8px 0 0; min-height:18px"></p>
+
+      <!-- Direct create panel -->
+      <div id="add-panel-direct">
+        <p style="font-size:12px; color:var(--text-2); margin:0 0 12px" data-i18n="direct_create_desc">由管理員直接建立帳號。預設密碼為公司統編，新成員首次登入後需自行修改密碼。</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
+          <div class="field" style="flex:2; min-width:160px">
+            <label data-i18n="new_member_email">新成員 Email</label>
+            <input type="email" id="direct-email" placeholder="someone@example.com" inputmode="email" />
+          </div>
+          <div class="field" style="flex:1; min-width:120px">
+            <label data-i18n="new_member_name">姓名</label>
+            <input type="text" id="direct-name" />
+          </div>
+          <button class="btn primary" id="btn-direct-create" style="height:42px"><span data-i18n="create_account">建立帳號</span></button>
+        </div>
+        <p id="direct-result" style="font-size:12px; margin:8px 0 0; min-height:18px"></p>
+      </div>
+
+      <!-- Invite panel -->
+      <div id="add-panel-invite" style="display:none">
+        <p style="font-size:12px; color:var(--text-2); margin:0 0 12px" data-i18n="invite_desc">輸入新員工 Email 與姓名後按「寄出邀請」，系統會自動寄一封邀請信給對方，對方點連結註冊即可加入此組織（首次註冊後需管理員核准）。</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end">
+          <div class="field" style="flex:2; min-width:160px">
+            <label data-i18n="new_member_email">新成員 Email</label>
+            <input type="email" id="invite-email" placeholder="someone@example.com" inputmode="email" />
+          </div>
+          <div class="field" style="flex:1; min-width:120px">
+            <label data-i18n="new_member_name">姓名</label>
+            <input type="text" id="invite-name" />
+          </div>
+          <button class="btn primary" id="btn-invite" style="height:42px"><span data-i18n="send_invite">寄出邀請</span></button>
+        </div>
+        <p id="invite-result" style="font-size:12px; margin:8px 0 0; min-height:18px"></p>
+      </div>
     </div>
     <div class="card">
       <p class="section-title"><span class="dot" style="background:var(--danger)"></span><span data-i18n="pending_members">待審核成員</span></p>
@@ -1656,6 +1683,14 @@
       approve: '核准',
       role_admin: '管理員', role_member: '成員',
       invite_member: '新增成員',
+      add_mode_direct: '直接建立帳號',
+      add_mode_invite: '寄出邀請信',
+      direct_create_desc: '由管理員直接建立帳號。預設密碼為公司統編，新成員首次登入後需自行修改密碼。',
+      create_account: '建立帳號',
+      account_created: '✓ 帳號已建立！預設密碼：',
+      account_created_hint: '請通知新成員此預設密碼，首次登入後需自行修改。',
+      err_email_exists: '此 Email 已存在帳號',
+      err_create_failed: '建立失敗：',
       invite_desc: '輸入新員工 Email 與姓名後按「寄出邀請」，系統會自動寄一封邀請信給對方，對方點連結註冊即可加入此組織（首次註冊後需管理員核准）。',
       new_member_email: '新成員 Email',
       new_member_name: '姓名',
@@ -1798,6 +1833,14 @@
       approve: 'Approve',
       role_admin: 'Admin', role_member: 'Member',
       invite_member: 'Add Member',
+      add_mode_direct: 'Create Account Directly',
+      add_mode_invite: 'Send Invitation',
+      direct_create_desc: 'Admin creates the account directly. Default password is the company tax ID; the new member should change it after first login.',
+      create_account: 'Create Account',
+      account_created: '✓ Account created! Default password: ',
+      account_created_hint: 'Please inform the new member of this default password; they should change it after first login.',
+      err_email_exists: 'An account with this email already exists',
+      err_create_failed: 'Create failed: ',
       invite_desc: 'Enter new employee email and name, then click "Send Invite". The system will auto-send an invitation email. After they register via the link, the admin needs to approve them once.',
       new_member_email: 'New Member Email',
       new_member_name: 'Name',
@@ -3740,6 +3783,16 @@
 
     // Refresh pending count for admins
     if(currentMember.role === 'admin') refreshPendingCount();
+
+    // Force change password if flagged (account was created by admin with default password)
+    if(currentMember.must_change_password){
+      setTimeout(() => {
+        alert(state.lang === 'en'
+          ? 'Your account was created by an admin. For security, please change your password now.'
+          : '您的帳號由管理員建立，請立即修改密碼以保護您的帳戶。');
+        if(typeof openAccountModal === 'function') openAccountModal();
+      }, 600);
+    }
   }
 
   async function doLogout(){
@@ -3940,6 +3993,81 @@
       + '&org=' + encodeURIComponent(currentOrg.name)
       + '&inv=1';  // signal: came from an invite link
     return url.toString();
+  }
+
+  // ==========================================
+  // DIRECT CREATE MEMBER (admin) — calls Edge Function
+  // ==========================================
+  async function directCreateMember(){
+    const email = $('direct-email').value.trim();
+    const name = $('direct-name').value.trim();
+    const resultEl = $('direct-result');
+    resultEl.innerHTML = '';
+    resultEl.style.color = 'var(--danger)';
+
+    if(!email || !name){
+      resultEl.textContent = t('err_required');
+      return;
+    }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      resultEl.textContent = t('err_invalid_email');
+      return;
+    }
+    if(!currentOrg || !currentOrg.tax_id){
+      resultEl.textContent = state.lang === 'en' ? 'Org tax_id missing' : '組織統編缺失';
+      return;
+    }
+
+    const password = currentOrg.tax_id;  // Default password = company tax ID
+
+    const btn = $('btn-direct-create');
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span>' + t('syncing') + '</span>';
+
+    try {
+      // Get caller's JWT
+      const { data: { session } } = await supa.auth.getSession();
+      if(!session) throw new Error('not_logged_in');
+
+      // Call Edge Function
+      const { data, error } = await supa.functions.invoke('admin-create-user', {
+        body: { email, display_name: name, password }
+      });
+
+      if(error){
+        // FunctionsHttpError doesn't always include the response body; try data
+        const detail = (error.context && await error.context.json().catch(() => ({}))) || data || {};
+        const errCode = detail.error || error.message || 'unknown';
+        if(errCode === 'email_exists'){
+          resultEl.textContent = t('err_email_exists');
+        } else if(errCode === 'not_admin'){
+          resultEl.textContent = state.lang === 'en' ? 'Only admin can do this' : '僅管理員可建立帳號';
+        } else {
+          resultEl.textContent = t('err_create_failed') + errCode;
+        }
+        return;
+      }
+
+      if(data && data.success){
+        resultEl.style.color = 'var(--accent)';
+        resultEl.innerHTML = t('account_created') + '<strong style="font-family:monospace">' + escapeHtml(password) + '</strong><br>'
+          + '<span style="color:var(--text-2)">' + t('account_created_hint') + '</span>';
+        toast(state.lang === 'en' ? 'Account created' : '帳號已建立', 'success');
+        $('direct-email').value = '';
+        $('direct-name').value = '';
+        // Refresh member list
+        if(typeof renderMembers === 'function') renderMembers();
+      } else {
+        resultEl.textContent = t('err_create_failed') + (data && data.error || 'unknown');
+      }
+    } catch(e){
+      console.error('directCreateMember error:', e);
+      resultEl.textContent = t('err_create_failed') + (e.message || 'network');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
   }
 
   async function sendInvite(){
@@ -4165,6 +4293,15 @@
     try {
       const { error } = await supa.auth.updateUser({ password: pw });
       if(error) throw error;
+      // Clear must_change_password flag if it was set
+      if(currentMember && currentMember.must_change_password){
+        try {
+          await supa.from('members').update({ must_change_password: false }).eq('id', currentUser.id);
+          currentMember.must_change_password = false;
+        } catch(updateErr){
+          console.warn('Failed to clear must_change_password flag:', updateErr);
+        }
+      }
       $('acct-new-password').value = '';
       $('acct-new-password-confirm').value = '';
       res.style.color = 'var(--accent)';
@@ -4207,6 +4344,17 @@
   $('btn-logout-pending').addEventListener('click', doLogout);
   $('btn-save-org').addEventListener('click', saveOrgSettings);
   $('btn-invite').addEventListener('click', sendInvite);
+  // Direct create
+  $('btn-direct-create').addEventListener('click', directCreateMember);
+  // Add mode tab switching
+  document.querySelectorAll('[data-add-mode]').forEach(b => {
+    b.addEventListener('click', () => {
+      const mode = b.dataset.addMode;
+      document.querySelectorAll('[data-add-mode]').forEach(x => x.classList.toggle('active', x === b));
+      $('add-panel-direct').style.display = mode === 'direct' ? '' : 'none';
+      $('add-panel-invite').style.display = mode === 'invite' ? '' : 'none';
+    });
+  });
 
   // Password management
   $('link-forgot').addEventListener('click', e => {
