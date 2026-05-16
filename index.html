@@ -600,24 +600,55 @@
 
   /* Toast */
   .toast {
-    position: fixed; bottom: 24px; left: 50%;
-    transform: translateX(-50%) translateY(20px);
+    position: fixed; top: 24px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
     background: var(--text); color: white;
-    padding: 12px 22px; border-radius: var(--radius);
-    font-size: 14px; font-weight: 500;
+    padding: 14px 24px 14px 20px;
+    border-radius: var(--radius);
+    font-size: 15px; font-weight: 500;
     opacity: 0; pointer-events: none;
-    transition: all 0.25s;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     z-index: 1000;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08);
     max-width: 90%;
-    text-align: center;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 4px solid currentColor;
   }
   .toast.show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
-  .toast.success { background: var(--accent); }
-  .toast.error { background: var(--danger); }
+  .toast.success { 
+    background: #15803d; 
+    color: white;
+    border-left-color: #4ade80;
+  }
+  .toast.error { 
+    background: #b91c1c; 
+    color: white;
+    border-left-color: #f87171;
+  }
+  .toast::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+  .toast.success::before {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>');
+  }
+  .toast.error::before {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>');
+  }
+  /* No icon for default toast */
+  .toast:not(.success):not(.error)::before { display: none; }
 
   /* Icons via simple unicode/CSS */
   .ico { font-style: normal; }
@@ -1110,7 +1141,7 @@
     .from-section, .to-section { padding: 0 !important; }
 
     /* Toast — push above the sticky action bar on mobile */
-    .toast { bottom: 90px; }
+    .toast { top: 16px; bottom: auto; }
   }
 
   /* Very small (≤380px) — iPhone SE etc */
@@ -2972,7 +3003,7 @@
     el.textContent = msg;
     el.className = 'toast show' + (type ? ' ' + type : '');
     clearTimeout(el._tid);
-    el._tid = setTimeout(() => el.className = 'toast', 2400);
+    el._tid = setTimeout(() => el.className = 'toast', 3500);
   }
 
   // Status helpers
@@ -3024,13 +3055,33 @@
   }
 
   // Build the action row (status select + load + delete) for a single quote
+  // The select options depend on the current effective status:
+  // - draft: can only become 'sent' (after actually sending) — draft stays draft
+  //   (no manual "accepted" / "rejected" — those require having sent first)
+  // - sent / expired: full set (sent, accepted, rejected)
+  // - accepted / rejected: full set so user can correct mistakes
   function buildQuoteActionRow(q){
+    const eff = effectiveStatus(q);
+    let options;
+    if(eff === 'draft'){
+      // Draft → only show 'draft' (locked). To send, user clicks Load → Send.
+      options = '<option value="draft" selected>'+statusLabel('draft')+'</option>';
+    } else {
+      // Sent / expired / accepted / rejected — can switch among these
+      const currentVal = q.status === 'draft' ? 'sent' : q.status;
+      options = 
+        '<option value="sent"'+(currentVal==='sent'?' selected':'')+'>'+statusLabel('sent')+'</option>'+
+        '<option value="accepted"'+(currentVal==='accepted'?' selected':'')+'>'+statusLabel('accepted')+'</option>'+
+        '<option value="rejected"'+(currentVal==='rejected'?' selected':'')+'>'+statusLabel('rejected')+'</option>';
+    }
+    const isDraft = eff === 'draft';
+    const selectStyle = isDraft 
+      ? 'padding:6px 10px; font-size:12px; opacity:0.5; cursor:not-allowed; background:var(--surface-2)'
+      : 'padding:6px 10px; font-size:12px';
+    const selectDisabled = isDraft ? ' disabled title="草稿無法直接改狀態，請載入後寄送"' : '';
     return '<div class="history-actions">'+
-      '<select class="btn" data-status-set="'+escapeHtml(q.id)+'" style="padding:6px 10px; font-size:12px">'+
-        '<option value="draft"'+(q.status==='draft'?' selected':'')+'>'+statusLabel('draft')+'</option>'+
-        '<option value="sent"'+(q.status==='sent'?' selected':'')+'>'+statusLabel('sent')+'</option>'+
-        '<option value="accepted"'+(q.status==='accepted'?' selected':'')+'>'+statusLabel('accepted')+'</option>'+
-        '<option value="rejected"'+(q.status==='rejected'?' selected':'')+'>'+statusLabel('rejected')+'</option>'+
+      '<select class="btn" data-status-set="'+escapeHtml(q.id)+'"'+selectDisabled+' style="'+selectStyle+'">'+
+        options+
       '</select>'+
       '<button class="btn" data-load="'+escapeHtml(q.id)+'">'+t('load')+'</button>'+
       '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">'+t('delete')+'</button>'+
@@ -3399,14 +3450,17 @@
       '</tr>';
     });
 
-    const headerName = ($('from-name').value || '').trim() || t('quotation_tool');
+    const headerName = ($('from-name').value || '').trim() || (state.lang === 'en' ? 'Quotation' : '報價單');
+    // Subtitle: prefer tax ID if available (most commonly needed for B2B quotes)
+    const fromTaxId = ($('from-tax').value || '').trim();
+    const subtitle = fromTaxId ? (state.lang === 'en' ? 'Tax ID: ' : '統一編號：') + fromTaxId : '';
     n.innerHTML =
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; border-bottom:2px solid #1a1a1a; padding-bottom:20px">'+
         '<div style="display:flex; align-items:center; gap:16px">'+
           (logo ? '<img src="'+logo+'" crossorigin="anonymous" style="width:64px; height:64px; object-fit:contain" />' : '')+
           '<div>'+
             '<div style="font-size:26px; font-weight:600; letter-spacing:1px">'+escapeHtml(headerName)+'</div>'+
-            '<div style="font-size:12px; color:#666; margin-top:2px">'+t('quotation_tool')+'</div>'+
+            (subtitle ? '<div style="font-size:12px; color:#666; margin-top:2px">'+escapeHtml(subtitle)+'</div>' : '')+
           '</div>'+
         '</div>'+
         '<div style="text-align:right">'+
