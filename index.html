@@ -653,25 +653,49 @@
     .app { padding: 12px 12px 100px; }
 
     /* Top bar — stack and full width */
-    .topbar { gap: 8px; margin-bottom: 14px; }
+    .topbar { gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .brand { width: 100%; }
     .brand h1 { font-size: 19px; }
-    .controls { width: 100%; gap: 6px; }
-    .tab-btn { flex: 1; justify-content: center; padding: 9px 6px; font-size: 13px; }
-    .lang-select { flex: 0 0 auto; min-width: 80px; }
+    
+    /* Tab bar: horizontal scroll, no wrap */
+    .controls { 
+      width: 100%; 
+      gap: 6px; 
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+    }
+    .controls::-webkit-scrollbar { display: none; }
+    .tab-btn { 
+      flex: 0 0 auto; 
+      justify-content: center; 
+      padding: 9px 14px; 
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .lang-select { flex: 0 0 auto; min-width: 70px; }
+    .user-bar { flex-shrink: 0; }
 
     /* Cards — tighter padding, more vertical space */
     .card { padding: 16px 14px; margin-bottom: 12px; border-radius: var(--radius); }
     .section-title { font-size: 12px; margin-bottom: 12px; }
 
     /* All grids collapse to single column */
-    .grid-2, .grid-3, .grid-4, .summary { grid-template-columns: 1fr; gap: 12px; }
+    .grid-2, .grid-3, .grid-4, .summary { grid-template-columns: 1fr !important; gap: 12px; }
     .meta-row { grid-template-columns: 1fr; gap: 14px; }
-    .logo-slot { width: 100%; max-width: 120px; height: 80px; margin: 0 auto; }
+    .logo-slot { width: 100%; max-width: 140px; height: 100px; margin: 0 auto; }
+
+    /* From/To: each on own row, never side-by-side */
+    .from-to-grid { display: flex !important; flex-direction: column !important; gap: 16px; }
 
     /* Larger touch targets, better mobile inputs */
     .field input, .field select, .field textarea {
       padding: 11px 12px; font-size: 16px; /* 16px prevents iOS zoom on focus */
       min-height: 44px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .field label { font-size: 13px; margin-bottom: 4px; }
 
@@ -737,6 +761,8 @@
       padding: 10px 12px; font-size: 16px;
       background: var(--surface);
       min-height: 44px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .items-table textarea { min-height: 60px; }
     .row-del { width: 32px; height: 32px; font-size: 18px; }
@@ -804,8 +830,28 @@
       padding: 12px;
     }
     .history-meta { width: 100%; }
-    .history-actions { width: 100%; }
-    .history-actions .btn { flex: 1; justify-content: center; min-height: 40px; }
+    .history-actions { 
+      width: 100%; 
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .history-actions .btn,
+    .history-actions select {
+      flex: 1; 
+      justify-content: center; 
+      min-height: 40px;
+      min-width: 0;
+      font-size: 12px;
+    }
+
+    /* Stats summary bar — wrap nicely */
+    #history-stats { font-size: 12px; line-height: 2; }
+
+    /* Status filter — full width */
+    #history-status-filter { width: 100%; }
+
+    /* From/To section: side-by-side dot label only */
+    .from-section, .to-section { padding: 0 !important; }
 
     /* Toast — push above the sticky action bar on mobile */
     .toast { bottom: 90px; }
@@ -1301,7 +1347,22 @@
             <input type="email" id="org-email" inputmode="email" />
           </div>
         </div>
-        <div style="text-align:right; margin-top:6px">
+
+        <!-- Company Signature (admin editable) -->
+        <div id="org-signature-section">
+          <div class="field" style="margin-top:18px">
+            <label data-i18n="org_signature_label">公司簽名檔（寄送報價單時自動帶入信件底部）</label>
+            <textarea id="org-signature" rows="6" data-i18n-ph="org_signature_ph" placeholder="例如：&#10;大坑科技股份有限公司&#10;網址：www.dakeng.com.tw&#10;地址：台南市東區XXX路123號" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
+            <small style="color:var(--text-3); font-size:11px; margin-top:4px" data-i18n="org_signature_hint">這是公司共用的簽名，所有業務寄報價單時都會附上。業務本人的聯絡資訊請至「我的帳號」設定。</small>
+          </div>
+        </div>
+        <div id="org-signature-readonly-note" style="display:none; font-size:12px; color:var(--text-2); margin-top:14px; padding:10px 14px; background:var(--surface-2); border-radius:var(--radius)">
+          <strong data-i18n="org_signature_label_short">公司簽名檔</strong>
+          <div id="org-signature-readonly-content" style="margin-top:6px; white-space:pre-wrap; color:var(--text-2); font-size:12px"></div>
+          <div style="font-size:11px; color:var(--text-3); margin-top:6px" data-i18n="org_signature_member_note">由管理員設定。您寄送報價單時會自動帶入此簽名。</div>
+        </div>
+
+        <div style="text-align:right; margin-top:14px">
           <button class="btn primary" id="btn-save-org"><span data-i18n="save">儲存</span></button>
         </div>
       </div>
@@ -1383,6 +1444,11 @@
         <div class="field" style="margin-bottom:10px">
           <label data-i18n="display_name">顯示名稱</label>
           <input type="text" id="acct-display-name" />
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label data-i18n="personal_signature_label">個人簽名檔（會接在公司簽名後）</label>
+          <textarea id="acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;直撥：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
+          <small style="color:var(--text-3); font-size:11px; margin-top:4px" data-i18n="personal_signature_hint">您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。</small>
         </div>
         <div style="text-align:right">
           <button class="btn primary" id="btn-save-profile"><span data-i18n="save_profile">儲存個人資料</span></button>
@@ -1619,7 +1685,7 @@
       conf_total: '總金額',
       conf_attach: '附件',
       mail_subject_tpl: '【{{from}} 報價單】{{quoteNo}} — {{client}}',
-      mail_body_tpl: '{{client}} {{contact}}您好，\n\n感謝您的詢價，謹此附上報價單，詳細內容請參閱附件 PDF。\n\n報價單編號：{{quoteNo}}\n報價日期：{{date}}\n有效期至：{{validUntil}}\n總金額：{{total}}\n\n如有任何疑問或需要進一步說明，歡迎隨時與我聯繫。\n期待與您的合作，謝謝。\n\n敬祝商祺\n\n{{from}}\n{{issuer}}\n{{phone}}\n{{email}}',
+      mail_body_tpl: '{{client}} {{contact}}您好，\n\n感謝您的詢價，謹此附上報價單，詳細內容請參閱附件 PDF。\n\n報價單編號：{{quoteNo}}\n報價日期：{{date}}\n有效期至：{{validUntil}}\n總金額：{{total}}\n\n如有任何疑問或需要進一步說明，歡迎隨時與我聯繫。\n期待與您的合作，謝謝。',
       sent_hint: '已開啟郵件草稿，請確認附件後送出',
       tab_clients: '客戶', tab_products: '品項',
       duplicate: '複製', search_ph: '搜尋客戶名、報價單號...',
@@ -1665,6 +1731,14 @@
       profile: '個人資料',
       display_name: '顯示名稱',
       save_profile: '儲存個人資料',
+      org_signature_label: '公司簽名檔（寄送報價單時自動帶入信件底部）',
+      org_signature_label_short: '公司簽名檔',
+      org_signature_ph: '例如：\n大坑科技股份有限公司\n網址：www.dakeng.com.tw\n地址：台南市東區XXX路123號',
+      org_signature_hint: '這是公司共用的簽名，所有業務寄報價單時都會附上。業務本人的聯絡資訊請至「我的帳號」設定。',
+      org_signature_member_note: '由管理員設定。您寄送報價單時會自動帶入此簽名。',
+      personal_signature_label: '個人簽名檔（會接在公司簽名後）',
+      personal_signature_ph: '例如：\n郭先生 / 業務代表\n直撥：0912-345-678\nLine ID：kuo-bd',
+      personal_signature_hint: '您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。',
       change_password: '修改密碼',
       profile_updated: '個人資料已更新',
       password_changed: '密碼已成功更新',
@@ -1774,7 +1848,7 @@
       conf_total: 'Total',
       conf_attach: 'Attachment',
       mail_subject_tpl: '[{{from}} Quotation] {{quoteNo}} — {{client}}',
-      mail_body_tpl: 'Dear {{contact}},\n\nThank you for your inquiry. Please find attached our quotation for your review.\n\nQuote No.: {{quoteNo}}\nIssue Date: {{date}}\nValid Until: {{validUntil}}\nTotal Amount: {{total}}\n\nShould you have any questions or require further clarification, please do not hesitate to contact me.\n\nWe look forward to working with you.\n\nBest regards,\n\n{{issuer}}\n{{from}}\n{{phone}}\n{{email}}',
+      mail_body_tpl: 'Dear {{contact}},\n\nThank you for your inquiry. Please find attached our quotation for your review.\n\nQuote No.: {{quoteNo}}\nIssue Date: {{date}}\nValid Until: {{validUntil}}\nTotal Amount: {{total}}\n\nShould you have any questions or require further clarification, please do not hesitate to contact me.\n\nWe look forward to working with you.',
       sent_hint: 'Mail draft opened. Attach the PDF and send.',
       tab_clients: 'Clients', tab_products: 'Items',
       duplicate: 'Duplicate', search_ph: 'Search by name, quote no...',
@@ -1820,6 +1894,14 @@
       profile: 'Profile',
       display_name: 'Display Name',
       save_profile: 'Save Profile',
+      org_signature_label: 'Company Signature (auto-appended to quote emails)',
+      org_signature_label_short: 'Company Signature',
+      org_signature_ph: 'e.g.\nDakeng Tech Co., Ltd.\nWebsite: www.dakeng.com.tw\nAddress: ...',
+      org_signature_hint: 'This is the company-wide signature, automatically added when anyone sends a quote. Personal contact info goes in "My Account".',
+      org_signature_member_note: 'Set by admin. This will be auto-appended when you send quotes.',
+      personal_signature_label: 'Personal Signature (appended after company signature)',
+      personal_signature_ph: 'e.g.\nKuo / Sales Representative\nMobile: 0912-345-678\nLine ID: kuo-bd',
+      personal_signature_hint: 'Your personal contact info (mobile, Line ID, etc). Added after the company signature when sending quotes.',
       change_password: 'Change Password',
       profile_updated: 'Profile updated',
       password_changed: 'Password changed successfully',
@@ -3506,6 +3588,16 @@
     return String(tpl||'').replace(/\{\{(\w+)\}\}/g, (m, k) => data[k] != null ? data[k] : '');
   }
 
+  // Build the email signature block: company signature + personal signature
+  function composeSignature(){
+    const orgSig = (currentOrg && currentOrg.signature_template || '').trim();
+    const personalSig = (currentMember && currentMember.signature_personal || '').trim();
+    const parts = [];
+    if(orgSig) parts.push(orgSig);
+    if(personalSig) parts.push(personalSig);
+    return parts.join('\n\n---\n\n');
+  }
+
   function buildMailContext(){
     const calc = recalc();
     const sym = curSym();
@@ -3565,7 +3657,9 @@
     $('mail-cc').value = autoCc;
     $('mail-bcc').value = '';
     $('mail-subject').value = fillTemplate(t('mail_subject_tpl'), ctx);
-    $('mail-body').value = fillTemplate(t('mail_body_tpl'), ctx);
+    const bodyMain = fillTemplate(t('mail_body_tpl'), ctx);
+    const sig = composeSignature();
+    $('mail-body').value = bodyMain + (sig ? '\n\n' + sig : '');
     $('attach-filename').textContent = ($('quote-no').value || 'quotation') + '.pdf';
 
     // Show warning if client email empty
@@ -4037,6 +4131,28 @@
       clearOrgLogoUI();
     }
     $('org-logo-status').textContent = '';
+
+    // Signature: admin can edit, member sees readonly
+    const sig = currentOrg.signature_template || '';
+    $('org-signature-section').style.display = isAdmin ? '' : 'none';
+    $('org-signature-readonly-note').style.display = isAdmin ? 'none' : (sig ? '' : 'none');
+    if(isAdmin){
+      $('org-signature').value = sig;
+    } else {
+      $('org-signature-readonly-content').textContent = sig;
+    }
+
+    // Other org fields: also lock down for non-admins
+    const orgFields = ['org-name','org-address','org-phone','org-email'];
+    orgFields.forEach(id => {
+      const el = $(id);
+      if(el){
+        el.disabled = !isAdmin;
+        if(!isAdmin) el.style.background = 'var(--surface-2)';
+        else el.style.background = '';
+      }
+    });
+    $('btn-save-org').style.display = isAdmin ? '' : 'none';
   }
 
   async function saveOrgSettings(){
@@ -4055,7 +4171,8 @@
         name: $('org-name').value.trim(),
         address: $('org-address').value.trim(),
         phone: $('org-phone').value.trim(),
-        email: $('org-email').value.trim()
+        email: $('org-email').value.trim(),
+        signature_template: $('org-signature').value
       };
       const { error } = await supa.from('organizations').update(updates).eq('id', currentOrg.id);
       if(error) throw error;
@@ -4409,6 +4526,7 @@
     if(!currentUser || !currentMember) return;
     $('acct-email').value = currentUser.email || '';
     $('acct-display-name').value = currentMember.display_name || '';
+    $('acct-signature').value = currentMember.signature_personal || '';
     $('acct-new-password').value = '';
     $('acct-new-password-confirm').value = '';
     $('acct-result').textContent = '';
@@ -4430,9 +4548,13 @@
     const btn = $('btn-save-profile');
     btn.disabled = true;
     try {
-      const { error } = await supa.from('members').update({ display_name: name }).eq('id', currentUser.id);
+      const signature = $('acct-signature').value;
+      const { error } = await supa.from('members')
+        .update({ display_name: name, signature_personal: signature })
+        .eq('id', currentUser.id);
       if(error) throw error;
       currentMember.display_name = name;
+      currentMember.signature_personal = signature;
       $('user-name').textContent = name;
       if($('from-contact').value && currentMember){
         $('from-contact').value = name;
