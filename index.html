@@ -2155,11 +2155,6 @@
   function curSym(){ return (currencies[$('currency').value] || currencies.TWD).symbol; }
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
   function todayStr(off){ const d = new Date(); d.setDate(d.getDate()+(off||0)); return d.toISOString().slice(0,10); }
-  // Quote number is generated when saving (uses org_code + daily sequence).
-  // For new quotes, leave the field empty until saved.
-  function genQuoteNo(){
-    return '';  // Empty until first save
-  }
 
   // Compute next daily sequence for this org by querying cloud (with local fallback)
   async function computeNextDailySeq(){
@@ -3233,37 +3228,6 @@
     r.readAsText(file);
   }
 
-  // --- Duplicate quote ---
-  function duplicateQuote(){
-    const items = JSON.parse(JSON.stringify(state.items));
-    const to = getClientFromForm();
-    const notes = $('notes').value;
-    const taxRate = $('tax-rate').value;
-    const discType = $('disc-type').value;
-    const discVal = $('disc-val').value;
-    const currency = $('currency').value;
-    newQuote();
-    state.items = items;
-    applyClientToForm(to);
-    $('notes').value = notes;
-    $('tax-rate').value = taxRate;
-    $('disc-type').value = discType;
-    $('disc-val').value = discVal;
-    $('currency').value = currency;
-    renderItems();
-    // Visual feedback: scroll to top and flash the new quote number
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const qn = $('quote-no');
-    qn.style.transition = 'background-color 0.4s';
-    qn.style.backgroundColor = 'var(--accent-soft)';
-    setTimeout(() => { qn.style.backgroundColor = ''; }, 1200);
-    const newNo = qn.value;
-    const msg = state.lang === 'en'
-      ? 'Duplicated as new quote: ' + newNo
-      : '已複製為新報價單：' + newNo;
-    toast(msg, 'success');
-  }
-
 
   document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
   $('add-row').addEventListener('click', () => { state.items.push({desc:'',qty:1,price:0}); renderItems(); });
@@ -3392,8 +3356,13 @@
   function buildMailContext(){
     const calc = recalc();
     const sym = curSym();
+    // If quote has no number yet, show a "pending" placeholder for the subject
+    let qn = $('quote-no').value || '';
+    if(!qn){
+      qn = state.lang === 'en' ? '(pending save)' : '（尚未儲存）';
+    }
     return {
-      quoteNo: $('quote-no').value || '',
+      quoteNo: qn,
       client: $('to-name').value || (state.lang==='en' ? 'Sir/Madam' : '貴公司'),
       contact: $('to-contact').value || (state.lang==='en' ? 'Sir/Madam' : '您'),
       date: $('quote-date').value || '',
@@ -3540,16 +3509,38 @@
     const to = $('mail-to').value.trim();
     const cc = $('mail-cc').value.trim();
     const bcc = $('mail-bcc').value.trim();
-    const subject = $('mail-subject').value;
+    let subject = $('mail-subject').value;
     const userBody = $('mail-body').value;
-    const filename = ($('quote-no').value || 'quotation') + '.pdf';
 
     try {
-      // STEP 1: Generate PDF
+      // STEP 1: Ensure quote has a number (before PDF, mailto, filename use it)
+      const qnEl = $('quote-no');
+      if(!qnEl.value.trim()){
+        if(!currentOrg || !currentOrg.org_code){
+          alert(state.lang === 'en'
+            ? 'Organization not loaded yet. Please save the quote first.'
+            : '組織資料尚未載入，請先儲存報價單再寄出');
+          sendBtn.disabled = false;
+          sendBtn.innerHTML = original;
+          return;
+        }
+        const seq = await computeNextDailySeq();
+        const realNo = formatQuoteNo(currentOrg.org_code, $('quote-date').value || todayStr(0), seq);
+        qnEl.value = realNo;
+        window._pendingDailySeq = seq;
+        // Refresh subject line if it contains placeholder
+        subject = subject
+          .replace('(pending save)', realNo)
+          .replace('（尚未儲存）', realNo);
+        $('mail-subject').value = subject;
+      }
+      const filename = ($('quote-no').value || 'quotation') + '.pdf';
+
+      // STEP 2: Generate PDF
       sendBtn.innerHTML = '<span>' + (state.lang === 'en' ? 'Generating PDF...' : '產生 PDF 中...') + '</span>';
       const pdfBlob = await generatePdfBlob();
 
-      // STEP 2: Try upload PDF to cloud (so we can include a download link in email)
+      // STEP 3: Try upload PDF to cloud
       sendBtn.innerHTML = '<span>' + (state.lang === 'en' ? 'Uploading...' : '上傳中...') + '</span>';
       let pdfUrl = '';
       try {
@@ -3558,15 +3549,15 @@
         console.warn('Storage upload failed; will offer local download', upErr);
       }
 
-      // STEP 3: Build email body
+      // STEP 4: Build email body with PDF link
       const linkBlock = pdfUrl
         ? '\n\n' + (state.lang === 'en'
             ? 'Download quotation PDF: ' + pdfUrl
-            : '報價單 PDF 下載連結：' + pdfUrl)
+            : '報價單 PDF 下載連結:' + pdfUrl)
         : '';
       let body = userBody + linkBlock;
 
-      // STEP 4: Build mailto URL
+      // STEP 5: Build mailto URL (with up-to-date subject)
       const buildMailtoUrl = (b) => {
         const params = [];
         if(cc) params.push('cc=' + encodeURIComponent(cc));
@@ -3576,7 +3567,7 @@
         return 'mailto:' + encodeURIComponent(to) + '?' + params.join('&');
       };
 
-      // mailto URL has length limits (~2048). Truncate if needed.
+      // mailto URL length safety
       let mailtoUrl = buildMailtoUrl(body);
       if(mailtoUrl.length > 1900){
         const overflow = mailtoUrl.length - 1900;
@@ -3597,8 +3588,12 @@
         URL.revokeObjectURL(blobUrl);
       }
 
-      // STEP 5: Save quote to history + push to cloud
+      // STEP 6: Save quote to history + push to cloud
       const s = snapshot();
+      if(window._pendingDailySeq){
+        s.dailySeq = window._pendingDailySeq;
+        delete window._pendingDailySeq;
+      }
       const arr = loadQuotes();
       const i = arr.findIndex(x => x.id === s.id);
       if(i >= 0) arr[i] = s; else arr.push(s);
@@ -3606,7 +3601,7 @@
       pushQuoteToCloud(s).catch(e => console.warn('cloud push failed', e));
       autoBackup('after-send');
 
-      // STEP 6: Open user's local mail client
+      // STEP 7: Open user's local mail client
       window.location.href = mailtoUrl;
 
       sendBtn.disabled = false;
