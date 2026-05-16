@@ -1353,7 +1353,10 @@
           <div class="field" style="margin-top:18px">
             <label data-i18n="org_signature_label">公司簽名檔（寄送報價單時自動帶入信件底部）</label>
             <textarea id="org-signature" rows="6" data-i18n-ph="org_signature_ph" placeholder="例如：&#10;大坑科技股份有限公司&#10;網址：www.dakeng.com.tw&#10;地址：台南市東區XXX路123號" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
-            <small style="color:var(--text-3); font-size:11px; margin-top:4px" data-i18n="org_signature_hint">這是公司共用的簽名，所有業務寄報價單時都會附上。業務本人的聯絡資訊請至「我的帳號」設定。</small>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-top:6px; flex-wrap:wrap">
+              <small style="color:var(--text-3); font-size:11px; flex:1; min-width:200px" data-i18n="org_signature_hint">這是公司共用的簽名，所有業務寄報價單時都會附上。業務本人的聯絡資訊請至「我的帳號」設定。</small>
+              <button type="button" class="btn" id="org-signature-insert-default" style="padding:6px 12px; font-size:12px; flex-shrink:0; display:none" data-i18n="insert_default_signature">套用預設範本</button>
+            </div>
           </div>
         </div>
         <div id="org-signature-readonly-note" style="display:none; font-size:12px; color:var(--text-2); margin-top:14px; padding:10px 14px; background:var(--surface-2); border-radius:var(--radius)">
@@ -1448,7 +1451,10 @@
         <div class="field" style="margin-bottom:10px">
           <label data-i18n="personal_signature_label">個人簽名檔（會接在公司簽名後）</label>
           <textarea id="acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;直撥：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
-          <small style="color:var(--text-3); font-size:11px; margin-top:4px" data-i18n="personal_signature_hint">您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。</small>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-top:6px; flex-wrap:wrap">
+            <small style="color:var(--text-3); font-size:11px; flex:1; min-width:200px" data-i18n="personal_signature_hint">您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。</small>
+            <button type="button" class="btn" id="personal-signature-insert-default" style="padding:6px 12px; font-size:12px; flex-shrink:0; display:none" data-i18n="insert_default_signature">套用預設範本</button>
+          </div>
         </div>
         <div style="text-align:right">
           <button class="btn primary" id="btn-save-profile"><span data-i18n="save_profile">儲存個人資料</span></button>
@@ -1735,6 +1741,7 @@
       org_signature_label_short: '公司簽名檔',
       org_signature_ph: '例如：\n大坑科技股份有限公司\n網址：www.dakeng.com.tw\n地址：台南市東區XXX路123號',
       org_signature_hint: '這是公司共用的簽名，所有業務寄報價單時都會附上。業務本人的聯絡資訊請至「我的帳號」設定。',
+      insert_default_signature: '套用預設範本',
       org_signature_member_note: '由管理員設定。您寄送報價單時會自動帶入此簽名。',
       personal_signature_label: '個人簽名檔（會接在公司簽名後）',
       personal_signature_ph: '例如：\n郭先生 / 業務代表\n直撥：0912-345-678\nLine ID：kuo-bd',
@@ -1898,6 +1905,7 @@
       org_signature_label_short: 'Company Signature',
       org_signature_ph: 'e.g.\nDakeng Tech Co., Ltd.\nWebsite: www.dakeng.com.tw\nAddress: ...',
       org_signature_hint: 'This is the company-wide signature, automatically added when anyone sends a quote. Personal contact info goes in "My Account".',
+      insert_default_signature: 'Insert Default',
       org_signature_member_note: 'Set by admin. This will be auto-appended when you send quotes.',
       personal_signature_label: 'Personal Signature (appended after company signature)',
       personal_signature_ph: 'e.g.\nKuo / Sales Representative\nMobile: 0912-345-678\nLine ID: kuo-bd',
@@ -3598,6 +3606,27 @@
     return parts.join('\n\n---\n\n');
   }
 
+  // Build a default signature template from organization basic info
+  function buildDefaultOrgSignature(){
+    if(!currentOrg) return '';
+    const lines = [];
+    if(currentOrg.name) lines.push(currentOrg.name);
+    if(currentOrg.address) lines.push(currentOrg.address);
+    if(currentOrg.phone) lines.push((state.lang === 'en' ? 'Tel: ' : '電話：') + currentOrg.phone);
+    if(currentOrg.email) lines.push('Email：' + currentOrg.email);
+    if(currentOrg.tax_id) lines.push((state.lang === 'en' ? 'Tax ID: ' : '統一編號：') + currentOrg.tax_id);
+    return lines.join('\n');
+  }
+
+  // Build a default personal signature from member info
+  function buildDefaultPersonalSignature(){
+    if(!currentMember) return '';
+    const lines = [];
+    if(currentMember.display_name) lines.push(currentMember.display_name);
+    if(currentMember.email) lines.push('Email：' + currentMember.email);
+    return lines.join('\n');
+  }
+
   function buildMailContext(){
     const calc = recalc();
     const sym = curSym();
@@ -4133,13 +4162,24 @@
     $('org-logo-status').textContent = '';
 
     // Signature: admin can edit, member sees readonly
-    const sig = currentOrg.signature_template || '';
+    const savedSig = currentOrg.signature_template || '';
     $('org-signature-section').style.display = isAdmin ? '' : 'none';
-    $('org-signature-readonly-note').style.display = isAdmin ? 'none' : (sig ? '' : 'none');
+    $('org-signature-readonly-note').style.display = isAdmin ? 'none' : (savedSig ? '' : 'none');
     if(isAdmin){
-      $('org-signature').value = sig;
+      // If no custom signature yet, pre-fill with a template built from org info
+      // Use placeholder attribute so it's hint-only (won't actually save unless user types)
+      $('org-signature').value = savedSig;
+      const tpl = buildDefaultOrgSignature();
+      $('org-signature').placeholder = tpl || (state.lang === 'en'
+        ? 'Enter your company signature here'
+        : '在此輸入公司簽名檔');
+      // If field is empty, show a button to insert the template
+      const insertBtn = $('org-signature-insert-default');
+      if(insertBtn){
+        insertBtn.style.display = (!savedSig && tpl) ? '' : 'none';
+      }
     } else {
-      $('org-signature-readonly-content').textContent = sig;
+      $('org-signature-readonly-content').textContent = savedSig;
     }
 
     // Other org fields: also lock down for non-admins
@@ -4526,7 +4566,18 @@
     if(!currentUser || !currentMember) return;
     $('acct-email').value = currentUser.email || '';
     $('acct-display-name').value = currentMember.display_name || '';
-    $('acct-signature').value = currentMember.signature_personal || '';
+    const savedPersonalSig = currentMember.signature_personal || '';
+    $('acct-signature').value = savedPersonalSig;
+    // Show "Insert Default" button if signature is empty AND we can build a template
+    const tpl = buildDefaultPersonalSignature();
+    const insertBtn = $('personal-signature-insert-default');
+    if(insertBtn){
+      insertBtn.style.display = (!savedPersonalSig && tpl) ? '' : 'none';
+    }
+    // Show template as placeholder hint
+    $('acct-signature').placeholder = tpl || (state.lang === 'en'
+      ? 'Enter your personal signature here'
+      : '在此輸入個人簽名');
     $('acct-new-password').value = '';
     $('acct-new-password-confirm').value = '';
     $('acct-result').textContent = '';
@@ -4677,6 +4728,36 @@
   $('user-bar').addEventListener('click', openAccountModal);
   $('account-close').addEventListener('click', closeAccountModal);
   $('btn-save-profile').addEventListener('click', saveProfile);
+
+  // "Insert Default" buttons for signatures — fills the textarea with template built from org/member info
+  const orgSigInsertBtn = $('org-signature-insert-default');
+  if(orgSigInsertBtn){
+    orgSigInsertBtn.addEventListener('click', () => {
+      const tpl = buildDefaultOrgSignature();
+      if(tpl){
+        $('org-signature').value = tpl;
+        $('org-signature').focus();
+        orgSigInsertBtn.style.display = 'none';
+        toast(state.lang === 'en' ? 'Template inserted — edit as needed' : '已套用預設範本，可自行修改', 'success');
+      } else {
+        toast(state.lang === 'en' ? 'Fill in basic info first' : '請先填寫公司基本資料', 'error');
+      }
+    });
+  }
+  const personalSigInsertBtn = $('personal-signature-insert-default');
+  if(personalSigInsertBtn){
+    personalSigInsertBtn.addEventListener('click', () => {
+      const tpl = buildDefaultPersonalSignature();
+      if(tpl){
+        $('acct-signature').value = tpl;
+        $('acct-signature').focus();
+        personalSigInsertBtn.style.display = 'none';
+        toast(state.lang === 'en' ? 'Template inserted — edit as needed' : '已套用預設範本，可自行修改', 'success');
+      } else {
+        toast(state.lang === 'en' ? 'Fill in display name first' : '請先填寫顯示名稱', 'error');
+      }
+    });
+  }
   $('btn-change-password').addEventListener('click', changePassword);
   $('account-modal').addEventListener('click', e => {
     // Don't auto-close on backdrop click
