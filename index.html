@@ -1463,6 +1463,7 @@
           <div class="field">
             <label data-i18n="cc_email">CC（副本）</label>
             <input type="email" id="mail-cc" list="email-suggest" autocomplete="off" placeholder="optional" />
+            <small style="color:var(--text-3); font-size:11px; margin-top:4px" data-i18n="cc_hint">若公司基本資料有設定 Email，會自動帶入；可手動修改或清除</small>
           </div>
           <div class="field">
             <label data-i18n="bcc_email">BCC（密件副本）</label>
@@ -1580,6 +1581,7 @@
       to_email: '收件人 Email',
       to_email_hint: '預設帶入客戶資料區的 Email，可手動修改',
       cc_email: 'CC（副本）',
+      cc_hint: '若公司基本資料有設定 Email，會自動帶入；可手動修改或清除',
       bcc_email: 'BCC（密件副本）',
       mail_subject: '主旨',
       mail_body: '內文',
@@ -1730,6 +1732,7 @@
       to_email: 'Recipient',
       to_email_hint: 'Pre-filled from client info — editable',
       cc_email: 'CC',
+      cc_hint: 'If company email is set in basic info, it will be auto-CCed; you can edit or clear it',
       bcc_email: 'BCC',
       mail_subject: 'Subject',
       mail_body: 'Message',
@@ -2318,15 +2321,16 @@
     $('from-email').value = ''; $('from-tax').value = '';
     $('notes').value = '';
     $('disc-val').value = 0; $('tax-rate').value = 5;
-    // Auto-fill sender from org
+    // Auto-fill sender from org (company info) + current member (personal info)
     if(currentOrg){
       $('from-name').value = currentOrg.name || '';
       $('from-address').value = currentOrg.address || '';
       $('from-phone').value = currentOrg.phone || '';
-      $('from-email').value = currentOrg.email || '';
       $('from-tax').value = currentOrg.tax_id || '';
     }
     if(currentMember){
+      // Sender Email = the logged-in user's own email (the salesperson)
+      $('from-email').value = currentMember.email || '';
       $('from-contact').value = currentMember.display_name || '';
     }
     renderItems();
@@ -3346,9 +3350,15 @@
   function openEmailModal(){
     const ctx = buildMailContext();
     const clientEmail = $('to-email').value.trim();
+    // Auto CC the company's contact email (if set in basic info), so company has a copy
+    // Skip if it would duplicate the sender's own email
+    const companyEmail = (currentOrg && currentOrg.email) ? currentOrg.email.trim() : '';
+    const senderEmail = (currentMember && currentMember.email) ? currentMember.email.trim() : '';
+    const autoCc = (companyEmail && companyEmail.toLowerCase() !== senderEmail.toLowerCase())
+      ? companyEmail : '';
 
     $('mail-to').value = clientEmail;
-    $('mail-cc').value = '';
+    $('mail-cc').value = autoCc;
     $('mail-bcc').value = '';
     $('mail-subject').value = fillTemplate(t('mail_subject_tpl'), ctx);
     $('mail-body').value = fillTemplate(t('mail_body_tpl'), ctx);
@@ -3775,15 +3785,18 @@
     showAuthScreen();
   }
 
-  // Auto-fill org info into "from" fields
+  // Auto-fill org info (company) + member info (salesperson) into "from" fields
   function populateFromOrg(){
     if(!currentOrg) return;
     if(!$('from-name').value) $('from-name').value = currentOrg.name || '';
     if(!$('from-address').value) $('from-address').value = currentOrg.address || '';
     if(!$('from-phone').value) $('from-phone').value = currentOrg.phone || '';
-    if(!$('from-email').value) $('from-email').value = currentOrg.email || '';
     if(!$('from-tax').value) $('from-tax').value = currentOrg.tax_id || '';
-    if(currentMember && !$('from-contact').value) $('from-contact').value = currentMember.display_name || '';
+    // The "from-email" is the salesperson's email (not the company's)
+    if(currentMember){
+      if(!$('from-email').value) $('from-email').value = currentMember.email || '';
+      if(!$('from-contact').value) $('from-contact').value = currentMember.display_name || '';
+    }
   }
 
   // ==========================================
