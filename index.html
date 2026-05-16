@@ -1713,7 +1713,7 @@
           </div>
           <div class="field">
             <label data-i18n="personal_signature_label">個人簽名檔（會接在公司簽名後）</label>
-            <textarea id="settings-acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;直撥：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
+            <textarea id="settings-acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;手機：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-top:6px; flex-wrap:wrap">
               <small style="color:var(--text-3); font-size:11px; flex:1; min-width:200px" data-i18n="personal_signature_hint">系統會自動將「顯示名稱／職稱／手機／Line ID／Email」拼成簽名。也可以手動編輯這裡，會優先使用您手動填寫的版本。</small>
               <button type="button" class="btn" id="settings-personal-signature-insert-default" style="padding:6px 12px; font-size:12px; flex-shrink:0" data-i18n="insert_default_signature">套用預設範本</button>
@@ -1840,7 +1840,7 @@
         </div>
         <div class="field" style="margin-bottom:10px">
           <label data-i18n="personal_signature_label">個人簽名檔（會接在公司簽名後）</label>
-          <textarea id="acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;直撥：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
+          <textarea id="acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;手機：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-top:6px; flex-wrap:wrap">
             <small style="color:var(--text-3); font-size:11px; flex:1; min-width:200px" data-i18n="personal_signature_hint">您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。</small>
             <button type="button" class="btn" id="personal-signature-insert-default" style="padding:6px 12px; font-size:12px; flex-shrink:0; display:none" data-i18n="insert_default_signature">套用預設範本</button>
@@ -2140,7 +2140,7 @@
       acct_line_id_ph: '例如：kuo-bd',
       org_signature_member_note: '由管理員設定。您寄送報價單時會自動帶入此簽名。',
       personal_signature_label: '個人簽名檔（會接在公司簽名後）',
-      personal_signature_ph: '例如：\n郭先生 / 業務代表\n直撥：0912-345-678\nLine ID：kuo-bd',
+      personal_signature_ph: '例如：\n郭先生 / 業務代表\n手機：0912-345-678\nLine ID：kuo-bd',
       personal_signature_hint: '系統會自動將「顯示名稱／職稱／手機／Line ID／Email」拼成簽名。也可以手動編輯這裡，會優先使用您手動填寫的版本。',
       change_password: '修改密碼',
       profile_updated: '個人資料已更新',
@@ -4192,7 +4192,7 @@
     else if(name) lines.push(name);
     else if(title) lines.push(title);
     // Mobile
-    if(currentMember.mobile) lines.push((state.lang === 'en' ? 'Mobile: ' : '直撥：') + currentMember.mobile);
+    if(currentMember.mobile) lines.push((state.lang === 'en' ? 'Mobile: ' : '手機：') + currentMember.mobile);
     // Email
     if(currentMember.email) lines.push('Email：' + currentMember.email);
     // Line ID
