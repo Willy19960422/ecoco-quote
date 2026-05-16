@@ -1568,7 +1568,7 @@
       save: '儲存', new: '新報價單', print: '列印', pdf: '匯出 PDF',
       history_title: '歷史報價', no_history: '尚無儲存的報價單',
       load: '載入', delete: '刪除',
-      pick_from_book: '選取', save_to_book: '存入',
+      pick_from_book: '選取', save_to_book: '儲存',
       saved: '已儲存', deleted: '已刪除', loaded: '已載入',
       contact_ph: '負責此報價的聯絡人',
       notes_ph: '付款條件、交貨方式、保固、其他備註...',
@@ -2311,6 +2311,7 @@
 
     // Reset UUID for new quote
     currentQuoteUuid = uid();
+    loadedClientSnapshot = null;  // not loaded from history → treat saves as fresh
     state.items = [{desc:'',qty:1,price:0}];
     $('quote-no').value = '';  // Empty until saved
     $('quote-date').value = todayStr(0);
@@ -2381,6 +2382,10 @@
     };
   }
 
+  // Track the original client data when loading an existing quote
+  // Used to detect if client info was modified before re-save
+  let loadedClientSnapshot = null;
+
   function loadSnapshot(q){
     // Restore UUID so re-saving updates the same row
     currentQuoteUuid = q.id || uid();
@@ -2407,6 +2412,27 @@
     $('tax-rate').value = q.taxRate != null ? q.taxRate : 5;
     state.items = (q.items && q.items.length) ? q.items : [{desc:'',qty:1,price:0}];
     renderItems();
+    // Snapshot the client data so we can detect modifications later
+    loadedClientSnapshot = {
+      name: t2.name || '',
+      contact: t2.contact || '',
+      address: t2.address || '',
+      phone: t2.phone || '',
+      email: t2.email || '',
+      taxId: t2.taxId || ''
+    };
+  }
+
+  // Compare current client form to the loaded snapshot
+  function clientFormChangedFromLoad(){
+    if(!loadedClientSnapshot) return true;  // not loaded from history → treat as new
+    const cur = getClientFromForm();
+    return cur.name !== loadedClientSnapshot.name
+        || cur.contact !== loadedClientSnapshot.contact
+        || cur.address !== loadedClientSnapshot.address
+        || cur.phone !== loadedClientSnapshot.phone
+        || cur.email !== loadedClientSnapshot.email
+        || cur.taxId !== loadedClientSnapshot.taxId;
   }
 
   function toast(msg, type){
@@ -2444,7 +2470,11 @@
     list.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', e => {
       const id = e.currentTarget.dataset.load;
       const q = loadQuotes().find(x => x.id === id);
-      if(q){ loadSnapshot(q); switchTab('editor'); toast(t('loaded')); }
+      if(q){
+        loadSnapshot(q);
+        switchTab('editor');
+        toast(state.lang === 'en' ? 'Loaded quote ' + (q.quoteNo || '') : '已載入報價單 ' + (q.quoteNo || ''), 'success');
+      }
     }));
     list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', e => {
       if(!confirm(t('confirm_delete'))) return;
@@ -3012,7 +3042,11 @@
     });
     list.querySelectorAll('[data-use]').forEach(b => b.addEventListener('click', e => {
       const c = loadClients().find(x => x.id === e.currentTarget.dataset.use);
-      if(c){ applyClientToForm(c); switchTab('editor'); toast(t('loaded')); }
+      if(c){
+        applyClientToForm(c);
+        switchTab('editor');
+        toast(state.lang === 'en' ? 'Client loaded: ' + c.name : '已載入客戶：' + c.name, 'success');
+      }
     }));
     list.querySelectorAll('[data-edit-c]').forEach(b => b.addEventListener('click', e => {
       const c = loadClients().find(x => x.id === e.currentTarget.dataset.editC);
@@ -3087,10 +3121,11 @@
       div.addEventListener('click', () => {
         if(pickerMode === 'client'){
           applyClientToForm(x);
-          toast(t('loaded'));
+          toast(state.lang === 'en' ? 'Client loaded: ' + x.name : '已載入客戶：' + x.name, 'success');
         } else {
           state.items.push({ desc: x.name, qty: 1, price: x.price || 0 });
           renderItems();
+          toast(state.lang === 'en' ? 'Item added: ' + x.name : '已加入品項：' + x.name, 'success');
         }
         closePicker();
       });
@@ -4470,18 +4505,54 @@
       _saveQuotesLocal(arr);
       // Cloud push (fire-and-forget — local already saved)
       pushQuoteToCloud(s).catch(e => console.warn('cloud push failed but local saved', e));
-      // Auto-save client
+      // Auto-save client (with smart de-dup + history-aware behavior)
       const c = getClientFromForm();
       if(c.name){
-        const cArr = loadClients();
-        const idx = cArr.findIndex(x => x.name === c.name);
-        c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
-        if(idx >= 0) cArr[idx] = c; else cArr.push(c);
-        saveClients(cArr);
-        pushClientToCloud(c).catch(e => console.warn('client push failed', e));
+        // Decide whether to update the address book:
+        // - Fresh quote (not loaded from history) → always update
+        // - Loaded quote + client data unchanged → don't touch address book
+        // - Loaded quote + client data changed → ask user
+        let shouldUpdateBook = true;
+        if(loadedClientSnapshot){
+          if(!clientFormChangedFromLoad()){
+            // Loaded from history and client untouched — don't write to address book
+            shouldUpdateBook = false;
+          } else {
+            // Loaded from history but client was modified — ask
+            const msg = state.lang === 'en'
+              ? 'Client details were modified. Update the address book with these new values?\n\nClick OK to update, Cancel to keep the address book unchanged (this quote will still be saved with the new values).'
+              : '您修改了客戶資料。是否同時更新客戶簿為最新資訊？\n\n按「確定」更新客戶簿，按「取消」保留客戶簿原資料（本張報價單仍會以新資料儲存）。';
+            shouldUpdateBook = confirm(msg);
+          }
+        }
+        if(shouldUpdateBook){
+          const cArr = loadClients();
+          const cTaxId = (c.taxId || '').trim();
+          const cNameKey = (c.name || '').trim().toLowerCase();
+          const idx = cArr.findIndex(x => {
+            const xTax = (x.taxId || '').trim();
+            const xName = (x.name || '').trim().toLowerCase();
+            if(cTaxId && xTax) return cTaxId === xTax;
+            return xName === cNameKey;
+          });
+          c.id = (idx >= 0 && cArr[idx].id) ? cArr[idx].id : uid();
+          if(idx >= 0) cArr[idx] = c; else cArr.push(c);
+          saveClients(cArr);
+          pushClientToCloud(c).catch(e => console.warn('client push failed', e));
+        }
       }
       // Auto-backup snapshot to localStorage
       autoBackup('after-save');
+      // Refresh the loaded client snapshot to reflect what we just saved
+      // (so future re-saves don't keep asking about the same modification)
+      loadedClientSnapshot = {
+        name: c.name || '',
+        contact: c.contact || '',
+        address: c.address || '',
+        phone: c.phone || '',
+        email: c.email || '',
+        taxId: c.taxId || ''
+      };
       const msg = state.lang === 'en'
         ? (isUpdate ? 'Quote updated' : 'Saved as ' + qnEl.value)
         : (isUpdate ? '已更新報價單' : '已儲存：' + qnEl.value);
@@ -4500,12 +4571,25 @@
     const c = getClientFromForm();
     if(!c.name){ alert(state.lang==='en'?'Client name is required':'請先填寫客戶名稱'); return; }
     const arr = loadClients();
-    const i = arr.findIndex(x => x.name === c.name);
-    c.id = (i >= 0 && arr[i].id) ? arr[i].id : uid();
-    if(i >= 0) arr[i] = c; else arr.push(c);
+    // De-dup priority: tax_id (if any) > name (case-insensitive trimmed)
+    const taxId = (c.taxId || '').trim();
+    const nameKey = (c.name || '').trim().toLowerCase();
+    const i = arr.findIndex(x => {
+      const xTax = (x.taxId || '').trim();
+      const xName = (x.name || '').trim().toLowerCase();
+      if(taxId && xTax) return taxId === xTax;  // both have tax_id → compare it
+      return xName === nameKey;                  // fall back to name compare
+    });
+    const isUpdate = i >= 0;
+    c.id = (isUpdate && arr[i].id) ? arr[i].id : uid();
+    if(isUpdate) arr[i] = c; else arr.push(c);
     saveClients(arr);
     pushClientToCloud(c).catch(e => console.warn('client push failed', e));
-    toast(t('saved_client'), 'success');
+    // Distinct toast for create vs update
+    const msg = isUpdate
+      ? (state.lang === 'en' ? 'Client updated: ' + c.name : '已更新客戶：' + c.name)
+      : (state.lang === 'en' ? 'Client saved: ' + c.name : '已儲存客戶：' + c.name);
+    toast(msg, 'success');
   });
 
   // Patch editor save (saveEditor) for client/product cloud push — wrap function
