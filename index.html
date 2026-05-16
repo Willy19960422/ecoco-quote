@@ -1250,7 +1250,7 @@
         </div>
         <div style="flex:1">
           <div style="font-weight:600; margin-bottom:4px" data-i18n="org_logo_title">公司 Logo</div>
-          <div style="font-size:12px; color:var(--text-2); margin-bottom:8px" data-i18n="org_logo_desc">點擊左側方框上傳，所有成員與報價單將自動使用此 Logo。檔案大小限制 2 MB，建議使用 PNG 透明背景。</div>
+          <div id="org-logo-desc-text" style="font-size:12px; color:var(--text-2); margin-bottom:8px" data-i18n="org_logo_desc_empty">點擊左側方框上傳 Logo，所有成員與報價單將自動使用此 Logo。檔案大小限制 2 MB，建議使用 PNG 透明背景。</div>
           <div id="org-logo-status" style="font-size:12px; color:var(--text-3)"></div>
         </div>
       </div>
@@ -1552,7 +1552,9 @@
       quotation_tool: '報價單工具', tab_editor: '編輯', tab_history: '歷史',
       upload_logo: '上傳 Logo', no_logo: '尚未設定 Logo',
       org_logo_title: '公司 Logo',
-      org_logo_desc: '點擊左側方框上傳，所有成員與報價單將自動使用此 Logo。檔案大小限制 2 MB，建議使用 PNG 透明背景。',
+      org_logo_desc_empty: '點擊左側方框上傳 Logo，所有成員與報價單將自動使用此 Logo。檔案大小限制 2 MB，建議使用 PNG 透明背景。',
+      org_logo_desc_has: '目前公司 Logo 已設定。點擊左側 Logo 可更換，或按 × 移除。檔案大小限制 2 MB。',
+      change_logo: '點擊更換 Logo',
       logo_member_note: '公司 Logo 由管理員設定，所有成員會自動套用',
       quote_no: '報價單編號', quote_no_hint: '儲存後自動產生', quote_date: '日期', valid_until: '有效期至', currency: '貨幣',
       from: '寄件方', to: '客戶',
@@ -1703,7 +1705,9 @@
       quotation_tool: 'Quotation Tool', tab_editor: 'Editor', tab_history: 'History',
       upload_logo: 'Upload Logo', no_logo: 'No logo set',
       org_logo_title: 'Company Logo',
-      org_logo_desc: 'Click the box on the left to upload. All members and quotations will use this logo. Max file size 2 MB, PNG with transparent background recommended.',
+      org_logo_desc_empty: 'Click the box on the left to upload a logo. All members and quotations will use this logo. Max file size 2 MB, PNG with transparent background recommended.',
+      org_logo_desc_has: 'Company logo is set. Click the logo on the left to replace, or × to remove. Max 2 MB.',
+      change_logo: 'Click to change',
       logo_member_note: 'Company logo is set by admin; all members will use it automatically',
       quote_no: 'Quote No.', quote_no_hint: 'Auto-generated on save', quote_date: 'Date', valid_until: 'Valid Until', currency: 'Currency',
       from: 'From', to: 'Bill To',
@@ -2752,9 +2756,7 @@
     if(!confirm(state.lang === 'en' ? 'Remove company logo?' : '確定移除公司 Logo？')) return;
     // Optimistic UI
     clearLogo();
-    $('org-logo-img').src = ''; $('org-logo-img').style.display = 'none';
-    $('org-logo-placeholder').style.display = '';
-    $('org-logo-slot').classList.remove('has-image');
+    clearOrgLogoUI();
     // Reflect in editor preview too
     $('logo-img').src = ''; $('logo-img').style.display = 'none';
     $('logo-placeholder').style.display = '';
@@ -2779,6 +2781,28 @@
     $('org-logo-img').style.display = 'block';
     $('org-logo-placeholder').style.display = 'none';
     $('org-logo-slot').classList.add('has-image');
+    // Update description text to "has logo" state
+    const desc = $('org-logo-desc-text');
+    if(desc){
+      desc.setAttribute('data-i18n', 'org_logo_desc_has');
+      desc.textContent = t('org_logo_desc_has');
+    }
+    // Update slot tooltip
+    $('org-logo-slot').title = t('change_logo');
+  }
+
+  function clearOrgLogoUI(){
+    $('org-logo-img').src = '';
+    $('org-logo-img').style.display = 'none';
+    $('org-logo-placeholder').style.display = '';
+    $('org-logo-slot').classList.remove('has-image');
+    // Update description text to "empty" state
+    const desc = $('org-logo-desc-text');
+    if(desc){
+      desc.setAttribute('data-i18n', 'org_logo_desc_empty');
+      desc.textContent = t('org_logo_desc_empty');
+    }
+    $('org-logo-slot').title = '';
   }
 
   // Upload base64/dataUrl Logo image to Supabase Storage
@@ -3821,10 +3845,7 @@
     if(currentOrg.logo_url){
       showOrgLogo(currentOrg.logo_url);
     } else {
-      $('org-logo-img').src = '';
-      $('org-logo-img').style.display = 'none';
-      $('org-logo-placeholder').style.display = '';
-      $('org-logo-slot').classList.remove('has-image');
+      clearOrgLogoUI();
     }
     $('org-logo-status').textContent = '';
   }
