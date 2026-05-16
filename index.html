@@ -1232,12 +1232,6 @@
             <div style="font-size:12px; color:var(--text-2); font-weight:500; margin-top:8px; padding-top:8px; border-top:1px solid var(--border)" id="user-menu-org">—</div>
           </div>
 
-          <!-- My Account shortcut -->
-          <button class="user-menu-item" id="menu-my-account">
-            <span style="flex:1; text-align:left" data-i18n="menu_my_account">我的帳號</span>
-            <span style="color:var(--text-3); font-size:11px">→</span>
-          </button>
-
           <!-- Language switcher -->
           <div class="user-menu-section">
             <div style="font-size:11px; color:var(--text-3); margin-bottom:6px; padding:0 12px" data-i18n="menu_language">語言</div>
@@ -5167,19 +5161,6 @@
   });
 
   // Menu items
-  $('menu-my-account').addEventListener('click', () => {
-    closeUserMenu();
-    switchTab('settings');
-    setTimeout(() => {
-      const header = document.querySelector('[data-toggle="settings-account"]');
-      const body = $('collapse-body-settings-account');
-      if(header && body){
-        if(body.style.display === 'none') header.click();
-        header.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 50);
-  });
-
   $('menu-logout').addEventListener('click', () => {
     closeUserMenu();
     if(typeof doLogout === 'function') doLogout();
