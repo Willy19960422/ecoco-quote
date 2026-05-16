@@ -14,7 +14,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   :root {
     --bg: #f7f7f5;
@@ -1533,16 +1532,8 @@
   });
 
   // ==========================================
-  // EMAILJS CONFIG
+  // STORAGE
   // ==========================================
-  const EMAILJS_PUBLIC_KEY = 'uXW6_AT9UEZ5ADkrg';
-  const EMAILJS_SERVICE_ID = 'service_gykvuot';
-  const EMAILJS_TPL_INVITE = 'template_7fr8o4a';
-  const EMAILJS_TPL_QUOTE  = 'template_2yggbxh';
-  if(window.emailjs){
-    window.emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-  }
-
   // Storage bucket
   const STORAGE_BUCKET = 'quotes';
 
@@ -1599,7 +1590,7 @@
       warn_no_email_desc: '客戶 Email 為空，請先到客戶資料區填寫 Email 後再試。',
       cancel: '取消', back: '← 返回修改',
       next_review: '下一步：最終確認',
-      confirm_send: '確定寄送',
+      confirm_send: '開啟郵件草稿',
       confirm_title: '確定寄送此報價單？',
       confirm_warn_title: '寄出後將無法收回',
       confirm_warn_desc: '請再次確認收件人、主旨與報價金額正確無誤。',
@@ -1749,7 +1740,7 @@
       warn_no_email_desc: 'Client Email is empty. Please fill in the client Email field first.',
       cancel: 'Cancel', back: '← Back',
       next_review: 'Next: Final Confirm',
-      confirm_send: 'Confirm & Send',
+      confirm_send: 'Open Mail Draft',
       confirm_title: 'Send this quotation?',
       confirm_warn_title: 'This action cannot be undone',
       confirm_warn_desc: 'Please verify the recipient, subject, and total amount are correct.',
@@ -3486,114 +3477,87 @@
 
     try {
       // STEP 1: Generate PDF
-      sendBtn.innerHTML = '' + (state.lang === 'en' ? 'Generating PDF...' : '產生 PDF...');
+      sendBtn.innerHTML = '<span>' + (state.lang === 'en' ? 'Generating PDF...' : '產生 PDF 中...') + '</span>';
       const pdfBlob = await generatePdfBlob();
 
-      // STEP 2: Upload to Supabase Storage
-      sendBtn.innerHTML = '' + (state.lang === 'en' ? 'Uploading...' : '上傳中...');
+      // STEP 2: Try upload PDF to cloud (so we can include a download link in email)
+      sendBtn.innerHTML = '<span>' + (state.lang === 'en' ? 'Uploading...' : '上傳中...') + '</span>';
       let pdfUrl = '';
       try {
         pdfUrl = await uploadPdfToStorage(pdfBlob, filename);
       } catch(upErr){
-        console.error('Storage upload failed:', upErr);
-        // Continue without URL — fallback path will download PDF locally
+        console.warn('Storage upload failed; will offer local download', upErr);
       }
 
-      // STEP 3: Build full message with PDF link
+      // STEP 3: Build email body
       const linkBlock = pdfUrl
         ? '\n\n' + (state.lang === 'en'
             ? 'Download quotation PDF: ' + pdfUrl
-            : '下載報價單 PDF：' + pdfUrl)
+            : '報價單 PDF 下載連結：' + pdfUrl)
         : '';
-      const fullMessage = userBody + linkBlock;
+      let body = userBody + linkBlock;
 
-      // STEP 4: Send via EmailJS
-      sendBtn.innerHTML = '' + (state.lang === 'en' ? 'Sending...' : '寄送中...');
-
-      if(!window.emailjs) throw new Error('EmailJS not loaded');
-
-      const params = {
-        to_email: to,
-        cc: cc || '',
-        bcc: bcc || '',
-        subject: subject,
-        message: fullMessage,
-        from_name: $('from-name').value || (currentOrg ? currentOrg.name : ''),
-        reply_to: $('from-email').value || (currentMember ? currentMember.email : '')
+      // STEP 4: Build mailto URL
+      const buildMailtoUrl = (b) => {
+        const params = [];
+        if(cc) params.push('cc=' + encodeURIComponent(cc));
+        if(bcc) params.push('bcc=' + encodeURIComponent(bcc));
+        params.push('subject=' + encodeURIComponent(subject));
+        params.push('body=' + encodeURIComponent(b));
+        return 'mailto:' + encodeURIComponent(to) + '?' + params.join('&');
       };
 
-      await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_QUOTE, params);
+      // mailto URL has length limits (~2048). Truncate if needed.
+      let mailtoUrl = buildMailtoUrl(body);
+      if(mailtoUrl.length > 1900){
+        const overflow = mailtoUrl.length - 1900;
+        const cutAt = Math.max(50, body.length - overflow - 50);
+        body = body.slice(0, cutAt) + '\n\n[' + (state.lang === 'en' 
+          ? 'Content truncated due to length. Please refer to the PDF link above.' 
+          : '內文過長已截斷，請參考上方 PDF 連結。') + ']';
+        mailtoUrl = buildMailtoUrl(body);
+      }
+
+      // If PDF upload failed, also download locally for manual attach
+      if(!pdfUrl){
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+      }
 
       // STEP 5: Save quote to history + push to cloud
       const s = snapshot();
       const arr = loadQuotes();
       const i = arr.findIndex(x => x.id === s.id);
       if(i >= 0) arr[i] = s; else arr.push(s);
-      saveQuotes(arr);
-      try { await pushQuoteToCloud(s); } catch(e){}
+      _saveQuotesLocal(arr);
+      pushQuoteToCloud(s).catch(e => console.warn('cloud push failed', e));
+      autoBackup('after-send');
+
+      // STEP 6: Open user's local mail client
+      window.location.href = mailtoUrl;
 
       sendBtn.disabled = false;
       sendBtn.innerHTML = original;
       closeEmailModal();
-      toast(state.lang === 'en' ? 'Quotation sent to ' + to : '報價單已寄送至 ' + to, 'success');
+
+      const hint = state.lang === 'en'
+        ? 'Your mail app should now open with a draft. Review and click Send.'
+        : '已開啟您的郵件程式並帶入草稿，請確認內容後按「發送」即可寄出';
+      toast(hint, 'success');
 
     } catch(err){
       console.error('Send error:', err);
       sendBtn.disabled = false;
       sendBtn.innerHTML = original;
-      const errMsg = err.text || err.message || 'Unknown error';
-
-      // Fallback: ask user if they want to use mailto instead
-      const useMailto = confirm(
-        (state.lang === 'en'
-          ? 'Auto-send failed: ' + errMsg + '\n\nFall back to opening your email app manually?'
-          : '自動寄信失敗：' + errMsg + '\n\n是否改用本機郵件程式手動寄送？')
-      );
-      if(!useMailto) return;
-
-      // Original mailto fallback path
-      let body = userBody;
-      const buildUrl = (b) => {
-        let url = 'mailto:' + encodeURIComponent(to);
-        const params = [];
-        if(cc) params.push('cc=' + encodeURIComponent(cc));
-        if(bcc) params.push('bcc=' + encodeURIComponent(bcc));
-        params.push('subject=' + encodeURIComponent(subject));
-        params.push('body=' + encodeURIComponent(b));
-        return url + '?' + params.join('&');
-      };
-
-      // Download PDF locally as fallback
-      try {
-        const blob2 = await generatePdfBlob();
-        const url2 = URL.createObjectURL(blob2);
-        const a = document.createElement('a');
-        a.href = url2; a.download = filename; a.click();
-        URL.revokeObjectURL(url2);
-      } catch(e){}
-
-      let url = buildUrl(body);
-      if(url.length > 1900){
-        const overflow = url.length - 1900;
-        const cutAt = Math.max(50, body.length - overflow - 50);
-        body = body.slice(0, cutAt) + '\n\n[' + (state.lang==='en' ? 'Content truncated — see attached PDF' : '內文過長已截斷，詳見附件 PDF') + ']';
-        url = buildUrl(body);
-      }
-      window.location.href = url;
-
-      // Still save the quote
-      const s = snapshot();
-      const arr = loadQuotes();
-      const i = arr.findIndex(x => x.id === s.id);
-      if(i >= 0) arr[i] = s; else arr.push(s);
-      saveQuotes(arr);
-
-      closeEmailModal();
-      toast(t('sent_hint'));
+      alert((state.lang === 'en' ? 'Error: ' : '錯誤：') + (err.message || err));
     }
   });
 
-  // ==========================================
+    // ==========================================
   // AUTH FLOW
   // ==========================================
   function showAuthScreen(){
@@ -4090,52 +4054,46 @@
     const btn = $('btn-invite');
     btn.disabled = true;
     const orig = btn.innerHTML;
-    btn.innerHTML = '' + t('syncing');
+    btn.innerHTML = '<span>' + t('syncing') + '</span>';
 
     try {
-      const inviteLink = generateInviteLink();
-
-      if(!window.emailjs){
-        throw new Error('EmailJS not loaded');
-      }
-
-      const params = {
-        to_email: email,
-        to_name: name,
-        org_name: currentOrg.name,
-        tax_id: currentOrg.tax_id,
-        invite_link: inviteLink,
-        inviter_name: currentMember.display_name || currentMember.email,
-        from_email: currentMember.email
-      };
-
-      await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TPL_INVITE, params);
-
-      resultEl.style.color = 'var(--accent)';
-      resultEl.innerHTML = '' + (state.lang === 'en'
-        ? 'Invitation sent to ' + email + '. After they register, approve them in "Pending Members".'
-        : '邀請信已自動寄出至 ' + email + '。對方註冊後請至「待審核成員」核准。');
-      toast(state.lang === 'en' ? 'Invitation sent!' : '邀請信已寄出', 'success');
-      $('invite-email').value = '';
-      $('invite-name').value = '';
-    } catch(e){
-      console.error('Invite error:', e);
-      // Fallback: open mailto
       const inviteLink = generateInviteLink();
       const subject = state.lang === 'en'
         ? 'You are invited to join ' + currentOrg.name + ' on the quotation system'
         : '邀請您加入 ' + currentOrg.name + ' 的報價單系統';
       const body = state.lang === 'en'
-        ? 'Hi ' + name + ',\n\nPlease register via this link:\n' + inviteLink + '\n\nUse this email: ' + email
-        : '您好 ' + name + '，\n\n請透過此連結註冊：\n' + inviteLink + '\n\n請使用此 Email：' + email;
-      const errMsg = e.text || e.message || 'Unknown';
+        ? 'Hi ' + name + ',\n\n'
+          + (currentMember.display_name || currentMember.email) + ' has invited you to join ' + currentOrg.name + ' on our quotation system.\n\n'
+          + 'Please register at this link:\n' + inviteLink + '\n\n'
+          + 'Use this email when registering: ' + email + '\n'
+          + 'Company tax ID: ' + currentOrg.tax_id + '\n\n'
+          + 'After registering, an admin will need to approve your access.\n\n'
+          + 'Thanks,\n' + (currentMember.display_name || currentMember.email)
+        : '您好 ' + name + '，\n\n'
+          + (currentMember.display_name || currentMember.email) + ' 邀請您加入「' + currentOrg.name + '」的報價單系統。\n\n'
+          + '請點選下方連結完成註冊：\n' + inviteLink + '\n\n'
+          + '註冊時請使用此 Email：' + email + '\n'
+          + '公司統編：' + currentOrg.tax_id + '\n\n'
+          + '註冊完成後，管理員會核准您的帳號。\n\n'
+          + '感謝，\n' + (currentMember.display_name || currentMember.email);
+
+      // Open user's local mail client with pre-filled invite
+      const mailtoUrl = 'mailto:' + encodeURIComponent(email)
+        + '?subject=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(body);
+      window.location.href = mailtoUrl;
+
+      resultEl.style.color = 'var(--accent)';
+      resultEl.innerHTML = state.lang === 'en'
+        ? 'Mail draft opened. Click Send in your email app to deliver the invitation to ' + email + '.'
+        : '已開啟郵件草稿。請於您的郵件程式按「發送」即可寄出邀請給 ' + email + '。';
+      toast(state.lang === 'en' ? 'Mail draft ready' : '邀請草稿已開啟', 'success');
+      $('invite-email').value = '';
+      $('invite-name').value = '';
+    } catch(e){
+      console.error('Invite error:', e);
       resultEl.style.color = 'var(--danger)';
-      resultEl.innerHTML = '' + (state.lang === 'en'
-        ? 'Auto-send failed (' + escapeHtml(errMsg) + '). Falling back to manual email.'
-        : '自動寄信失敗（' + escapeHtml(errMsg) + '），改用本機郵件草稿。');
-      setTimeout(() => {
-        window.location.href = 'mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-      }, 1500);
+      resultEl.textContent = (state.lang === 'en' ? 'Error: ' : '錯誤：') + (e.message || e);
     } finally {
       btn.disabled = false;
       btn.innerHTML = orig;
