@@ -2618,6 +2618,13 @@
   // --- PDF Export via html2canvas (preserves CJK fonts) ---
   // Generate PDF blob (shared between download & upload)
   async function generatePdfBlob(){
+    // Ensure Logo is available as base64 before building PDF DOM (CORS-safe)
+    if(currentOrg && currentOrg.logo_url && !currentOrg.logo_base64){
+      try {
+        const b64 = await fetchImageAsBase64(currentOrg.logo_url);
+        if(b64) currentOrg.logo_base64 = b64;
+      } catch(e){ console.warn('Logo prefetch before PDF failed:', e); }
+    }
     const node = buildPdfNode();
     document.body.appendChild(node);
     try {
@@ -2702,10 +2709,12 @@
     const calc = recalc();
     const sym = curSym();
     const n = document.createElement('div');
-    // Prefer cloud logo (organization-shared); fall back to local img element
-    const logo = (currentOrg && currentOrg.logo_url)
-      ? currentOrg.logo_url
-      : ($('logo-img').src && $('logo-img').style.display !== 'none' ? $('logo-img').src : '');
+    // For PDF: prefer base64 (CORS-safe) > cloud URL > local img element
+    const logo = (currentOrg && currentOrg.logo_base64)
+      ? currentOrg.logo_base64
+      : (currentOrg && currentOrg.logo_url)
+        ? currentOrg.logo_url
+        : ($('logo-img').src && $('logo-img').style.display !== 'none' ? $('logo-img').src : '');
     n.style.cssText = 'position:fixed; left:-99999px; top:0; width:794px; padding:48px 56px; background:white; font-family:"Noto Sans TC","Inter",sans-serif; color:#1a1a1a; font-size:13px; line-height:1.6;';
 
     const fromBlock = [
@@ -2898,6 +2907,24 @@
     const idx = publicUrl.indexOf(marker);
     if(idx === -1) return null;
     return decodeURIComponent(publicUrl.substring(idx + marker.length));
+  }
+
+  // Fetch an image URL and convert to base64 data URL (for PDF embedding without CORS issues)
+  async function fetchImageAsBase64(url){
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if(!res.ok) throw new Error('fetch failed: ' + res.status);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+    } catch(e){
+      console.warn('fetchImageAsBase64 failed for', url, e);
+      return null;
+    }
   }
 
   $('org-logo-remove').addEventListener('click', async e => {
@@ -3892,6 +3919,10 @@
     if(currentOrg && currentOrg.logo_url){
       showLogo(currentOrg.logo_url);
       saveLogo(currentOrg.logo_url);  // refresh local cache
+      // ALSO pre-fetch as base64 for PDF generation (avoids CORS issues with html2canvas)
+      fetchImageAsBase64(currentOrg.logo_url).then(b64 => {
+        if(b64) currentOrg.logo_base64 = b64;
+      }).catch(e => console.warn('Logo base64 prefetch failed:', e));
     } else {
       // No cloud logo. Check local cache (e.g. user uploaded but cloud upload failed earlier)
       const cached = loadLogo();
