@@ -503,6 +503,77 @@
     .collapse-desc { font-size: 11px; }
     .collapse-body { padding: 4px 14px 14px 20px; }
   }
+
+  /* History section grouping (drafts pinned to top) */
+  .history-section {
+    margin-bottom: 18px;
+  }
+  .history-section:last-child {
+    margin-bottom: 0;
+  }
+  .history-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+  }
+  .history-section-draft .history-section-header {
+    background: linear-gradient(to right, #fff7ed 0%, #fef3c7 100%);
+    border-color: #fcd34d;
+  }
+  .history-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    flex: 1;
+  }
+  .history-section-draft .history-section-title {
+    color: #92400e;
+  }
+  .history-section-count {
+    background: white;
+    color: var(--text-2);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .history-section-count-draft {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+  }
+  .history-section-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
+  .history-section-draft .history-section-body {
+    border-color: #fcd34d;
+    background: #fffbeb;
+  }
+  /* When inside a section, items should not have their own outer border */
+  .history-section-body .history-item {
+    border: 1px solid var(--border);
+    background: white;
+  }
+  .history-section-draft .history-section-body .history-item {
+    border-color: #fed7aa;
+  }
+
   .history-item {
     display: flex; justify-content: space-between;
     align-items: center; gap: 12px;
@@ -1200,6 +1271,7 @@
       </button>
       <button class="tab-btn" data-tab="history">
         <span data-i18n="tab_history">歷史</span>
+        <span id="draft-count-badge" style="display:none; background:var(--danger); color:white; padding:1px 7px; border-radius:10px; font-size:10px; font-weight:600; margin-left:4px"></span>
       </button>
       <button class="tab-btn" data-tab="clients">
         <span data-i18n="tab_clients">客戶</span>
@@ -2545,6 +2617,8 @@
       }));
       saveQuotes(local);
       setSyncing(false);
+      // Refresh draft badge in case cloud brought new drafts
+      refreshDraftBadge();
     } catch(e){ console.error(e); setSyncing(false, e); }
   }
 
@@ -2935,26 +3009,70 @@
     return q.status || 'draft';
   }
 
+  // Refresh "draft count" badge on the History tab button
+  // Counts only quotes that are still in 'draft' state (not sent yet)
+  function refreshDraftBadge(){
+    const badge = $('draft-count-badge');
+    if(!badge) return;
+    const draftCount = loadQuotes().filter(q => effectiveStatus(q) === 'draft').length;
+    if(draftCount > 0){
+      badge.textContent = draftCount;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Build the action row (status select + load + delete) for a single quote
+  function buildQuoteActionRow(q){
+    return '<div class="history-actions">'+
+      '<select class="btn" data-status-set="'+escapeHtml(q.id)+'" style="padding:6px 10px; font-size:12px">'+
+        '<option value="draft"'+(q.status==='draft'?' selected':'')+'>'+statusLabel('draft')+'</option>'+
+        '<option value="sent"'+(q.status==='sent'?' selected':'')+'>'+statusLabel('sent')+'</option>'+
+        '<option value="accepted"'+(q.status==='accepted'?' selected':'')+'>'+statusLabel('accepted')+'</option>'+
+        '<option value="rejected"'+(q.status==='rejected'?' selected':'')+'>'+statusLabel('rejected')+'</option>'+
+      '</select>'+
+      '<button class="btn" data-load="'+escapeHtml(q.id)+'">'+t('load')+'</button>'+
+      '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">'+t('delete')+'</button>'+
+    '</div>';
+  }
+
+  // Build a single quote item HTML
+  function buildQuoteItem(q){
+    const c = currencies[q.currency] || currencies.TWD;
+    const totalStr = c.symbol + ' ' + (Math.round((q.total||0)*100)/100).toLocaleString();
+    const eff = effectiveStatus(q);
+    return '<div class="history-item">'+
+      '<div class="history-meta">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+          '<strong>'+escapeHtml(q.quoteNo||q.id)+'</strong>'+
+          statusBadge(eff)+
+          '<span style="color:var(--text-2)">— '+escapeHtml((q.to&&q.to.name)||'—')+'</span>'+
+        '</div>'+
+        '<span>'+(q.savedAt||'').slice(0,10)+' · '+totalStr+'</span>'+
+      '</div>'+
+      buildQuoteActionRow(q)+
+    '</div>';
+  }
+
   function renderHistory(){
     const list = $('history-list');
     const q = (($('history-search') && $('history-search').value) || '').toLowerCase();
     const statusFilter = $('history-status-filter') ? $('history-status-filter').value : 'all';
-    let arr = loadQuotes()
+
+    const all = loadQuotes()
       .filter(x => !q || ((x.quoteNo||'') + ' ' + ((x.to&&x.to.name)||'')).toLowerCase().includes(q))
       .sort((a,b) => (b.savedAt||'').localeCompare(a.savedAt||''));
-    // Apply status filter
-    if(statusFilter && statusFilter !== 'all'){
-      arr = arr.filter(x => effectiveStatus(x) === statusFilter);
-    }
-    // Render stats summary
+
+    // Render stats summary (always uses unfiltered counts)
     const summaryEl = $('history-stats');
     if(summaryEl){
       const counts = { draft:0, sent:0, accepted:0, rejected:0, expired:0 };
-      const all = loadQuotes();
-      all.forEach(x => { counts[effectiveStatus(x)] = (counts[effectiveStatus(x)]||0) + 1; });
+      const allUnfiltered = loadQuotes();
+      allUnfiltered.forEach(x => { counts[effectiveStatus(x)] = (counts[effectiveStatus(x)]||0) + 1; });
       summaryEl.innerHTML =
-        '<span style="cursor:pointer" data-stat="all">'+(state.lang==='en'?'All':'全部')+' <strong>'+all.length+'</strong></span>'+
-        ' · <span style="cursor:pointer" data-stat="draft">'+statusLabel('draft')+' <strong>'+counts.draft+'</strong></span>'+
+        '<span style="cursor:pointer" data-stat="all">'+(state.lang==='en'?'All':'全部')+' <strong>'+allUnfiltered.length+'</strong></span>'+
+        ' · <span style="cursor:pointer" data-stat="draft">'+statusLabel('draft')+' <strong'+(counts.draft>0?' style="color:var(--danger)"':'')+'>'+counts.draft+'</strong></span>'+
         ' · <span style="cursor:pointer" data-stat="sent">'+statusLabel('sent')+' <strong>'+counts.sent+'</strong></span>'+
         ' · <span style="cursor:pointer" data-stat="accepted">'+statusLabel('accepted')+' <strong style="color:#15803d">'+counts.accepted+'</strong></span>'+
         ' · <span style="cursor:pointer" data-stat="rejected">'+statusLabel('rejected')+' <strong style="color:#b91c1c">'+counts.rejected+'</strong></span>'+
@@ -2966,35 +3084,69 @@
         }
       }));
     }
-    if(arr.length === 0){ list.innerHTML = '<div class="empty">'+t('no_history')+'</div>'; return; }
-    list.innerHTML = '';
-    arr.forEach(q => {
-      const c = currencies[q.currency] || currencies.TWD;
-      const totalStr = c.symbol + ' ' + (Math.round((q.total||0)*100)/100).toLocaleString();
-      const eff = effectiveStatus(q);
-      const div = document.createElement('div');
-      div.className = 'history-item';
-      div.innerHTML =
-        '<div class="history-meta">'+
-          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-            '<strong>'+escapeHtml(q.quoteNo||q.id)+'</strong>'+
-            statusBadge(eff)+
-            '<span style="color:var(--text-2)">— '+escapeHtml((q.to&&q.to.name)||'—')+'</span>'+
-          '</div>'+
-          '<span>'+(q.savedAt||'').slice(0,10)+' · '+totalStr+'</span>'+
+
+    // Empty state
+    if(all.length === 0){ list.innerHTML = '<div class="empty">'+t('no_history')+'</div>'; return; }
+
+    // Split into draft vs others based on effective status
+    const drafts = all.filter(x => effectiveStatus(x) === 'draft');
+    const others = all.filter(x => effectiveStatus(x) !== 'draft');
+
+    let html = '';
+
+    // Apply status filter: only show selected groups
+    const showDrafts = !statusFilter || statusFilter === 'all' || statusFilter === 'draft';
+    const showOthers = !statusFilter || statusFilter === 'all' || statusFilter !== 'draft';
+
+    // Draft section (top, with notice if any)
+    if(showDrafts && drafts.length > 0){
+      html += '<div class="history-section history-section-draft">'+
+        '<div class="history-section-header">'+
+          '<span class="history-section-title">'+
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'+
+            (state.lang==='en' ? 'Drafts (not sent yet)' : '草稿 — 尚未寄出')+
+          '</span>'+
+          '<span class="history-section-count history-section-count-draft">'+drafts.length+'</span>'+
         '</div>'+
-        '<div class="history-actions">'+
-          '<select class="btn" data-status-set="'+escapeHtml(q.id)+'" style="padding:6px 10px; font-size:12px">'+
-            '<option value="draft"'+(q.status==='draft'?' selected':'')+'>'+statusLabel('draft')+'</option>'+
-            '<option value="sent"'+(q.status==='sent'?' selected':'')+'>'+statusLabel('sent')+'</option>'+
-            '<option value="accepted"'+(q.status==='accepted'?' selected':'')+'>'+statusLabel('accepted')+'</option>'+
-            '<option value="rejected"'+(q.status==='rejected'?' selected':'')+'>'+statusLabel('rejected')+'</option>'+
-          '</select>'+
-          '<button class="btn" data-load="'+escapeHtml(q.id)+'">'+t('load')+'</button>'+
-          '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">'+t('delete')+'</button>'+
-        '</div>';
-      list.appendChild(div);
-    });
+        '<div class="history-section-body">'+
+          drafts.map(buildQuoteItem).join('')+
+        '</div>'+
+      '</div>';
+    }
+
+    // Filter others by status if needed
+    let othersFiltered = others;
+    if(statusFilter && statusFilter !== 'all' && statusFilter !== 'draft'){
+      othersFiltered = others.filter(x => effectiveStatus(x) === statusFilter);
+    }
+
+    // Others section
+    if(showOthers && othersFiltered.length > 0){
+      const sectionLabel = (statusFilter && statusFilter !== 'all' && statusFilter !== 'draft')
+        ? statusLabel(statusFilter)
+        : (state.lang==='en' ? 'Completed / In Progress' : '已寄出 / 已成交 / 已拒絕 / 已過期');
+      html += '<div class="history-section">'+
+        '<div class="history-section-header">'+
+          '<span class="history-section-title">'+
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'+
+            sectionLabel+
+          '</span>'+
+          '<span class="history-section-count">'+othersFiltered.length+'</span>'+
+        '</div>'+
+        '<div class="history-section-body">'+
+          othersFiltered.map(buildQuoteItem).join('')+
+        '</div>'+
+      '</div>';
+    }
+
+    // Empty after filtering
+    if(html === ''){
+      html = '<div class="empty">'+t('no_history')+'</div>';
+    }
+
+    list.innerHTML = html;
+
+    // Bind events on the freshly rendered items
     list.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', e => {
       const id = e.currentTarget.dataset.load;
       const q = loadQuotes().find(x => x.id === id);
@@ -3008,16 +3160,15 @@
       if(!confirm(t('confirm_delete'))) return;
       const id = e.currentTarget.dataset.del;
       saveQuotes(loadQuotes().filter(x => x.id !== id));
-      // Also delete from cloud
       if(currentMember){
         supa.from('quotes').delete().eq('id', id).then(({error}) => {
           if(error) console.warn('cloud delete failed', error);
         });
       }
       renderHistory();
+      refreshDraftBadge();
       toast(t('deleted'));
     }));
-    // Status change dropdown
     list.querySelectorAll('[data-status-set]').forEach(sel => sel.addEventListener('change', async e => {
       const id = e.currentTarget.dataset.statusSet;
       const newStatus = e.currentTarget.value;
@@ -3027,7 +3178,6 @@
       all[i].status = newStatus;
       all[i].statusUpdatedAt = new Date().toISOString();
       saveQuotes(all);
-      // Update cloud (fire-and-forget)
       if(currentMember){
         try {
           await supa.from('quotes')
@@ -3039,6 +3189,7 @@
         ? 'Status changed to ' + statusLabel(newStatus) 
         : '狀態已改為「' + statusLabel(newStatus) + '」', 'success');
       renderHistory();
+      refreshDraftBadge();
     }));
   }
 
@@ -4300,6 +4451,8 @@
       _saveQuotesLocal(arr);
       pushQuoteToCloud(s).catch(e => console.warn('cloud push failed', e));
       autoBackup('after-send');
+      // Refresh draft badge (quote just moved from draft → sent)
+      refreshDraftBadge();
 
       // STEP 6: Open user's local mail client
       window.location.href = mailtoUrl;
@@ -5508,6 +5661,8 @@
       }
       // Auto-backup snapshot to localStorage
       autoBackup('after-save');
+      // Refresh the draft count badge (top right of "History" tab)
+      refreshDraftBadge();
       // Refresh the loaded client snapshot to reflect what we just saved
       // (so future re-saves don't keep asking about the same modification)
       loadedClientSnapshot = {
