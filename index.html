@@ -317,7 +317,122 @@
   }
 
   /* History */
+  /* User menu dropdown */
+  .user-menu-wrap { position: relative; }
+  .user-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 260px;
+    max-width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+    z-index: 100;
+    overflow: hidden;
+    animation: menuPop 0.15s ease;
+  }
+  @keyframes menuPop {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .user-menu-section { padding: 12px; }
+  .user-menu-status { background: var(--surface-2); }
+  .user-menu-item {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    padding: 11px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    transition: background-color 0.15s;
+    text-align: left;
+  }
+  .user-menu-item:hover { background: var(--surface-2); }
+  .user-menu-danger { color: var(--danger); font-weight: 500; }
+  .user-menu-danger:hover { background: rgba(239,68,68,0.08); }
+  .user-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+  .lang-pill {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text-2);
+    transition: all 0.15s;
+  }
+  .lang-pill:hover { background: var(--surface); }
+  .lang-pill.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* History list */
   .history-list { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Collapsible section (settings page) */
+  .collapsible { padding: 0; overflow: hidden; }
+  .collapse-header {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    padding: 16px 20px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: inherit;
+    color: var(--text);
+    border-radius: var(--radius);
+    transition: background-color 0.15s;
+  }
+  .collapse-header:hover { background: var(--surface-2); }
+  .collapse-arrow {
+    font-size: 11px;
+    color: var(--text-2);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+    width: 14px;
+  }
+  .collapsible.expanded .collapse-arrow { transform: rotate(90deg); }
+  .collapse-title {
+    font-weight: 600;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .collapse-desc {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-left: auto;
+    text-align: right;
+  }
+  .collapse-body {
+    padding: 4px 20px 20px;
+    border-top: 1px solid var(--border);
+    margin-top: 0;
+  }
+  @media (max-width: 640px) {
+    .collapse-header { padding: 14px 14px; gap: 8px; flex-wrap: wrap; }
+    .collapse-title { font-size: 14px; }
+    .collapse-desc { font-size: 11px; width: 100%; margin-left: 0; margin-top: 4px; text-align: left; padding-left: 22px; }
+    .collapse-body { padding: 4px 14px 14px; }
+  }
   .history-item {
     display: flex; justify-content: space-between;
     align-items: center; gap: 12px;
@@ -1022,21 +1137,55 @@
       <button class="tab-btn" data-tab="products">
         <span data-i18n="tab_products">品項</span>
       </button>
-      <button class="tab-btn" data-tab="org">
-        <span data-i18n="tab_org">基本資料</span>
-      </button>
-      <button class="tab-btn" data-tab="members" id="tab-btn-members" style="display:none">
-        <span data-i18n="tab_members">成員</span>
+      <button class="tab-btn" data-tab="settings" id="tab-btn-settings">
+        <span data-i18n="tab_settings">設定</span>
         <span id="pending-badge" style="display:none; background:var(--danger); color:white; padding:1px 6px; border-radius:10px; font-size:10px; margin-left:4px"></span>
       </button>
-      <button class="user-bar" id="user-bar" title="我的帳號設定（修改密碼、姓名等）">
-        <span style="font-size:14px"></span>
-        <strong id="user-name"></strong>
-        <span class="org-badge" id="user-role"></span>
-        <span style="font-size:10px; color:var(--text-3); margin-left:2px">▼</span>
-      </button>
-      <button class="tab-btn" id="btn-logout" title="登出"><span data-i18n="logout">登出</span></button>
-      <select id="lang" class="lang-select">
+      <div class="user-menu-wrap">
+        <button class="user-bar" id="user-bar" title="帳號選單">
+          <span style="font-size:14px"></span>
+          <strong id="user-name"></strong>
+          <span class="org-badge" id="user-role"></span>
+          <span style="font-size:10px; color:var(--text-3); margin-left:2px">▼</span>
+        </button>
+        <!-- Dropdown menu -->
+        <div class="user-menu" id="user-menu" style="display:none">
+          <!-- Status block -->
+          <div class="user-menu-section user-menu-status">
+            <div style="display:flex; align-items:center; gap:8px">
+              <div style="width:32px; height:32px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:14px" id="user-avatar-letter">?</div>
+              <div style="flex:1; min-width:0; overflow:hidden">
+                <div style="font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" id="user-menu-name">—</div>
+                <div style="font-size:11px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap" id="user-menu-email">—</div>
+              </div>
+            </div>
+            <div style="font-size:11px; color:var(--text-3); margin-top:8px; padding-top:8px; border-top:1px solid var(--border)" id="user-menu-org">—</div>
+          </div>
+
+          <!-- My Account shortcut -->
+          <button class="user-menu-item" id="menu-my-account">
+            <span style="flex:1; text-align:left" data-i18n="menu_my_account">我的帳號</span>
+            <span style="color:var(--text-3); font-size:11px">→</span>
+          </button>
+
+          <!-- Language switcher -->
+          <div class="user-menu-section">
+            <div style="font-size:11px; color:var(--text-3); margin-bottom:6px; padding:0 12px" data-i18n="menu_language">語言</div>
+            <div style="display:flex; gap:4px; padding:0 12px">
+              <button class="lang-pill" data-lang="zh">中文</button>
+              <button class="lang-pill" data-lang="en">English</button>
+            </div>
+          </div>
+
+          <!-- Logout (red, divider above) -->
+          <div class="user-menu-divider"></div>
+          <button class="user-menu-item user-menu-danger" id="menu-logout">
+            <span style="flex:1; text-align:left" data-i18n="logout">登出</span>
+          </button>
+        </div>
+      </div>
+      <!-- Hidden compat: lang select kept for code that reads it; sync with pills -->
+      <select id="lang" style="display:none">
         <option value="zh">中文</option>
         <option value="en">English</option>
       </select>
@@ -1291,8 +1440,17 @@
     </div>
   </div>
 
-  <!-- Organization Settings -->
-  <div id="tab-org" style="display:none">
+  <!-- Settings (Combined: Org + My Account + Members) -->
+  <div id="tab-settings" style="display:none">
+
+    <!-- Section 1: Company Info (collapsible) -->
+    <div class="card collapsible" data-collapse="settings-org">
+      <button type="button" class="collapse-header" data-toggle="settings-org">
+        <span class="collapse-arrow">▶</span>
+        <span class="collapse-title" data-i18n="settings_org_title">公司資料</span>
+        <span class="collapse-desc" data-i18n="settings_org_desc">統編、地址、Logo、公司簽名檔</span>
+      </button>
+      <div class="collapse-body" id="collapse-body-settings-org" style="display:none">
     <div class="card">
       <p class="section-title"><span class="dot"></span><span data-i18n="org_title">組織資料</span></p>
       <p style="font-size:12px; color:var(--text-2); margin:0 0 16px" data-i18n="org_desc">這裡的資料會自動帶入每張新報價單的「寄件方」欄位。</p>
@@ -1370,10 +1528,73 @@
         </div>
       </div>
     </div>
-  </div>
+      </div>
+    </div>
 
-  <!-- Members (Admin only) -->
-  <div id="tab-members" style="display:none">
+    <!-- Section 2: My Account (collapsible) -->
+    <div class="card collapsible" data-collapse="settings-account">
+      <button type="button" class="collapse-header" data-toggle="settings-account">
+        <span class="collapse-arrow">▶</span>
+        <span class="collapse-title" data-i18n="settings_account_title">我的帳號</span>
+        <span class="collapse-desc" data-i18n="settings_account_desc">姓名、Email、個人簽名、修改密碼</span>
+      </button>
+      <div class="collapse-body" id="collapse-body-settings-account" style="display:none">
+        <!-- My account form (mirrors account-modal but inline) -->
+        <div style="display:flex; flex-direction:column; gap:12px">
+          <div class="grid-2" style="gap:12px">
+            <div class="field">
+              <label data-i18n="email">Email</label>
+              <input type="email" id="settings-acct-email" disabled style="background:var(--surface-2)" />
+            </div>
+            <div class="field">
+              <label data-i18n="display_name">顯示名稱</label>
+              <input type="text" id="settings-acct-display-name" />
+            </div>
+          </div>
+          <div class="field">
+            <label data-i18n="personal_signature_label">個人簽名檔（會接在公司簽名後）</label>
+            <textarea id="settings-acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;直撥：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-top:6px; flex-wrap:wrap">
+              <small style="color:var(--text-3); font-size:11px; flex:1; min-width:200px" data-i18n="personal_signature_hint">您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。</small>
+              <button type="button" class="btn" id="settings-personal-signature-insert-default" style="padding:6px 12px; font-size:12px; flex-shrink:0; display:none" data-i18n="insert_default_signature">套用預設範本</button>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <button class="btn primary" id="settings-btn-save-profile"><span data-i18n="save_profile">儲存個人資料</span></button>
+          </div>
+
+          <hr style="border:none; border-top:1px solid var(--border); margin:10px 0">
+
+          <div>
+            <p class="section-title" style="margin-bottom:10px"><span class="dot" style="background:var(--accent)"></span><span data-i18n="change_password">修改密碼</span></p>
+            <div class="grid-2" style="gap:12px">
+              <div class="field">
+                <label data-i18n="new_password">新密碼 (至少 8 碼)</label>
+                <input type="password" id="settings-acct-new-password" autocomplete="new-password" minlength="8" />
+              </div>
+              <div class="field">
+                <label data-i18n="confirm_password">確認新密碼</label>
+                <input type="password" id="settings-acct-new-password-confirm" autocomplete="new-password" minlength="8" />
+              </div>
+            </div>
+            <div style="text-align:right; margin-top:10px">
+              <button class="btn primary" id="settings-btn-change-password"><span data-i18n="change_password">修改密碼</span></button>
+            </div>
+            <p id="settings-acct-result" style="font-size:12px; margin:8px 0 0; min-height:18px"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Members Management (admin only, collapsible) -->
+    <div class="card collapsible" id="settings-members-section" data-collapse="settings-members" style="display:none">
+      <button type="button" class="collapse-header" data-toggle="settings-members">
+        <span class="collapse-arrow">▶</span>
+        <span class="collapse-title" data-i18n="settings_members_title">成員管理</span>
+        <span class="collapse-desc" data-i18n="settings_members_desc">新增成員、待審核、組織成員</span>
+        <span id="pending-badge-settings" style="display:none; background:var(--danger); color:white; padding:1px 6px; border-radius:10px; font-size:10px; margin-left:6px"></span>
+      </button>
+      <div class="collapse-body" id="collapse-body-settings-members" style="display:none">
     <div class="card">
       <p class="section-title"><span class="dot" style="background:var(--accent)"></span><span data-i18n="invite_member">新增成員</span></p>
 
@@ -1425,6 +1646,9 @@
       <p class="section-title"><span class="dot"></span><span data-i18n="active_members">組織成員</span></p>
       <div id="active-members-list"></div>
     </div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -1765,6 +1989,15 @@
       err_network: '網路錯誤，請稍後再試',
       // Org
       tab_org: '基本資料', tab_members: '成員',
+      tab_settings: '設定',
+      menu_my_account: '我的帳號',
+      menu_language: '語言',
+      settings_org_title: '公司資料',
+      settings_org_desc: '統編、地址、Logo、公司簽名檔',
+      settings_account_title: '我的帳號',
+      settings_account_desc: '姓名、Email、個人簽名、修改密碼',
+      settings_members_title: '成員管理',
+      settings_members_desc: '新增成員、待審核、組織成員',
       org_title: '基本資料設定',
       org_desc: '這裡的資料會自動帶入每張新報價單的「寄件方」欄位。',
       // Members
@@ -1929,6 +2162,15 @@
       err_network: 'Network error, please try again',
       // Org
       tab_org: 'Basic Info', tab_members: 'Members',
+      tab_settings: 'Settings',
+      menu_my_account: 'My Account',
+      menu_language: 'Language',
+      settings_org_title: 'Company Info',
+      settings_org_desc: 'Tax ID, address, logo, company signature',
+      settings_account_title: 'My Account',
+      settings_account_desc: 'Name, email, personal signature, password',
+      settings_members_title: 'Members',
+      settings_members_desc: 'Add members, pending approval, active list',
       org_title: 'Basic Information',
       org_desc: 'This info auto-fills the "From" section of every new quote.',
       // Members
@@ -2696,13 +2938,70 @@
 
   function switchTab(name){
     document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-    ['editor','history','clients','products'].forEach(n => {
+    ['editor','history','clients','products','settings'].forEach(n => {
       const el = $('tab-'+n);
       if(el) el.style.display = name === n ? '' : 'none';
     });
     if(name === 'history') renderHistory();
     if(name === 'clients') renderClientsList();
     if(name === 'products') renderProductsList();
+    if(name === 'settings') renderSettingsPage();
+  }
+
+  // Render settings page (load all 3 sections' data)
+  function renderSettingsPage(){
+    // Render org section (existing function)
+    if(typeof renderOrgSettings === 'function') renderOrgSettings();
+    // Show/hide members section based on role
+    const isAdmin = currentMember && currentMember.role === 'admin';
+    const membersSection = $('settings-members-section');
+    if(membersSection) membersSection.style.display = isAdmin ? '' : 'none';
+    // Render members lists if admin
+    if(isAdmin && typeof refreshPendingCount === 'function'){
+      refreshPendingCount();
+    }
+    // Render my account section
+    if(currentUser && currentMember){
+      const emailEl = $('settings-acct-email');
+      const nameEl = $('settings-acct-display-name');
+      const sigEl = $('settings-acct-signature');
+      if(emailEl) emailEl.value = currentUser.email || '';
+      if(nameEl) nameEl.value = currentMember.display_name || '';
+      if(sigEl){
+        const savedSig = currentMember.signature_personal || '';
+        sigEl.value = savedSig;
+        const tpl = buildDefaultPersonalSignature();
+        sigEl.placeholder = tpl || (state.lang === 'en' ? 'Enter your personal signature here' : '在此輸入個人簽名');
+        const btn = $('settings-personal-signature-insert-default');
+        if(btn) btn.style.display = (!savedSig && tpl) ? '' : 'none';
+      }
+    }
+  }
+
+  // Collapsible section toggle (accordion-style: open one closes others)
+  function setupCollapsibles(){
+    document.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.toggle;
+        const body = $('collapse-body-' + key);
+        const card = btn.closest('.collapsible');
+        if(!body || !card) return;
+        const isOpen = body.style.display !== 'none';
+        // Close all collapsibles in the same tab
+        const allCollapsibles = card.parentElement.querySelectorAll('.collapsible');
+        allCollapsibles.forEach(c => {
+          const k = c.getAttribute('data-collapse');
+          const b = $('collapse-body-' + k);
+          if(b) b.style.display = 'none';
+          c.classList.remove('expanded');
+        });
+        // Open this one (if it wasn't already open)
+        if(!isOpen){
+          body.style.display = '';
+          card.classList.add('expanded');
+        }
+      });
+    });
   }
 
   // --- PDF Export via html2canvas (preserves CJK fonts) ---
@@ -4032,8 +4331,8 @@
       tb.textContent = currentOrg.name;
       tb.removeAttribute('data-i18n');
     }
-    if(currentMember.role === 'admin'){ $('tab-btn-members').style.display = ''; }
-    else { $('tab-btn-members').style.display = 'none'; }
+    // (Members tab merged into Settings tab; the Settings tab is always visible.
+    // Admin-only sections inside Settings are toggled in renderSettingsPage().)
 
     // Show app
     showApp();
@@ -4250,9 +4549,13 @@
     try {
       const { count } = await supa.from('members').select('*', { count: 'exact', head: true })
         .eq('org_id', currentMember.org_id).eq('approved', false);
-      const badge = $('pending-badge');
-      if(count && count > 0){ badge.textContent = count; badge.style.display = ''; }
-      else { badge.style.display = 'none'; }
+      [$('pending-badge'), $('pending-badge-settings')].forEach(badge => {
+        if(!badge) return;
+        if(count && count > 0){ badge.textContent = count; badge.style.display = ''; }
+        else { badge.style.display = 'none'; }
+      });
+      // Also refresh the members list inside settings if it's visible
+      if(typeof renderMembers === 'function') renderMembers();
     } catch(e){ console.error(e); }
   }
 
@@ -4688,7 +4991,7 @@
   }));
   $('btn-login').addEventListener('click', doLogin);
   $('btn-register').addEventListener('click', doRegister);
-  $('btn-logout').addEventListener('click', doLogout);
+  // btn-logout removed (logout now lives in user menu dropdown)
   $('btn-logout-pending').addEventListener('click', doLogout);
   $('btn-save-org').addEventListener('click', saveOrgSettings);
   $('btn-invite').addEventListener('click', sendInvite);
@@ -4725,9 +5028,189 @@
   $('reset-password-confirm').addEventListener('keydown', e => { if(e.key === 'Enter') doResetPassword(); });
 
   // Account modal
-  $('user-bar').addEventListener('click', openAccountModal);
+  // User menu dropdown logic
+  function openUserMenu(){
+    // Refresh content
+    const menu = $('user-menu');
+    if(!menu) return;
+    // Avatar letter
+    const name = (currentMember && currentMember.display_name) || (currentUser && currentUser.email) || '?';
+    $('user-avatar-letter').textContent = name.charAt(0).toUpperCase();
+    $('user-menu-name').textContent = (currentMember && currentMember.display_name) || (currentUser && currentUser.email) || '—';
+    $('user-menu-email').textContent = (currentUser && currentUser.email) || '—';
+    // Org info
+    if(currentOrg){
+      const code = currentOrg.org_code ? String(currentOrg.org_code).padStart(5,'0') : '';
+      $('user-menu-org').textContent = (currentOrg.name || '') + (code ? ' · ' + code : '');
+    } else {
+      $('user-menu-org').textContent = '—';
+    }
+    // Active language pill
+    document.querySelectorAll('.lang-pill').forEach(p => {
+      p.classList.toggle('active', p.dataset.lang === state.lang);
+    });
+    menu.style.display = '';
+  }
+  function closeUserMenu(){
+    const menu = $('user-menu');
+    if(menu) menu.style.display = 'none';
+  }
+  function toggleUserMenu(){
+    const menu = $('user-menu');
+    if(!menu) return;
+    if(menu.style.display === 'none') openUserMenu();
+    else closeUserMenu();
+  }
+
+  $('user-bar').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleUserMenu();
+  });
+
+  // Click outside to close
+  document.addEventListener('click', (e) => {
+    const menu = $('user-menu');
+    if(!menu || menu.style.display === 'none') return;
+    if(!e.target.closest('#user-menu') && !e.target.closest('#user-bar')){
+      closeUserMenu();
+    }
+  });
+  // ESC to close
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape') closeUserMenu();
+  });
+
+  // Menu items
+  $('menu-my-account').addEventListener('click', () => {
+    closeUserMenu();
+    switchTab('settings');
+    setTimeout(() => {
+      const header = document.querySelector('[data-toggle="settings-account"]');
+      const body = $('collapse-body-settings-account');
+      if(header && body){
+        if(body.style.display === 'none') header.click();
+        header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+  });
+
+  $('menu-logout').addEventListener('click', () => {
+    closeUserMenu();
+    if(typeof doLogout === 'function') doLogout();
+  });
+
+  // Language pills — switch language & sync hidden select
+  document.querySelectorAll('.lang-pill').forEach(p => {
+    p.addEventListener('click', () => {
+      const newLang = p.dataset.lang;
+      if(newLang === state.lang) return;
+      state.lang = newLang;
+      // Sync hidden select (existing code may listen to it)
+      const sel = $('lang');
+      if(sel){
+        sel.value = newLang;
+        sel.dispatchEvent(new Event('change'));
+      }
+      // Update active state immediately
+      document.querySelectorAll('.lang-pill').forEach(x => x.classList.toggle('active', x.dataset.lang === newLang));
+      if(typeof applyI18n === 'function') applyI18n();
+      // Refresh various views
+      if(typeof renderItems === 'function') renderItems();
+      if(typeof renderHistory === 'function') renderHistory();
+      if(typeof renderClientsList === 'function') renderClientsList();
+    });
+  });
   $('account-close').addEventListener('click', closeAccountModal);
   $('btn-save-profile').addEventListener('click', saveProfile);
+
+  // Settings tab — "My Account" section inline buttons
+  const settingsBtnSaveProfile = $('settings-btn-save-profile');
+  if(settingsBtnSaveProfile){
+    settingsBtnSaveProfile.addEventListener('click', async () => {
+      const name = $('settings-acct-display-name').value.trim();
+      if(!name){
+        toast(state.lang === 'en' ? 'Display name required' : '請填寫顯示名稱', 'error');
+        return;
+      }
+      const sig = $('settings-acct-signature').value;
+      const btn = $('settings-btn-save-profile');
+      btn.disabled = true;
+      try {
+        const { error } = await supa.from('members')
+          .update({ display_name: name, signature_personal: sig })
+          .eq('id', currentUser.id);
+        if(error) throw error;
+        currentMember.display_name = name;
+        currentMember.signature_personal = sig;
+        $('user-name').textContent = name;
+        toast(state.lang === 'en' ? 'Profile saved' : '個人資料已儲存', 'success');
+      } catch(e){
+        toast((state.lang === 'en' ? 'Save failed: ' : '儲存失敗：') + (e.message || e), 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  const settingsBtnChangePw = $('settings-btn-change-password');
+  if(settingsBtnChangePw){
+    settingsBtnChangePw.addEventListener('click', async () => {
+      const pw = $('settings-acct-new-password').value;
+      const pwc = $('settings-acct-new-password-confirm').value;
+      const res = $('settings-acct-result');
+      res.textContent = '';
+      if(pw.length < 8){
+        res.style.color = 'var(--danger)';
+        res.textContent = state.lang === 'en' ? 'Password must be at least 8 characters' : '密碼至少 8 碼';
+        return;
+      }
+      if(pw !== pwc){
+        res.style.color = 'var(--danger)';
+        res.textContent = state.lang === 'en' ? 'Passwords do not match' : '兩次密碼不一致';
+        return;
+      }
+      settingsBtnChangePw.disabled = true;
+      try {
+        const { error } = await supa.auth.updateUser({ password: pw });
+        if(error) throw error;
+        if(currentMember && currentMember.must_change_password){
+          try {
+            await supa.from('members').update({ must_change_password: false }).eq('id', currentUser.id);
+            currentMember.must_change_password = false;
+          } catch(e){}
+        }
+        $('settings-acct-new-password').value = '';
+        $('settings-acct-new-password-confirm').value = '';
+        res.style.color = 'var(--accent)';
+        res.textContent = state.lang === 'en' ? 'Password changed' : '密碼已修改';
+        toast(state.lang === 'en' ? 'Password changed' : '密碼已修改', 'success');
+      } catch(e){
+        res.style.color = 'var(--danger)';
+        res.textContent = e.message || (state.lang === 'en' ? 'Failed' : '失敗');
+      } finally {
+        settingsBtnChangePw.disabled = false;
+      }
+    });
+  }
+
+  // Settings — personal signature default template button
+  const settingsPersonalSigBtn = $('settings-personal-signature-insert-default');
+  if(settingsPersonalSigBtn){
+    settingsPersonalSigBtn.addEventListener('click', () => {
+      const tpl = buildDefaultPersonalSignature();
+      if(tpl){
+        $('settings-acct-signature').value = tpl;
+        $('settings-acct-signature').focus();
+        settingsPersonalSigBtn.style.display = 'none';
+        toast(state.lang === 'en' ? 'Template inserted — edit as needed' : '已套用預設範本，可自行修改', 'success');
+      } else {
+        toast(state.lang === 'en' ? 'Fill in display name first' : '請先填寫顯示名稱', 'error');
+      }
+    });
+  }
+
+  // Setup all collapsible sections
+  setupCollapsibles();
 
   // "Insert Default" buttons for signatures — fills the textarea with template built from org/member info
   const orgSigInsertBtn = $('org-signature-insert-default');
