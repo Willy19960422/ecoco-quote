@@ -1651,6 +1651,9 @@
 
   </div>
 
+</div>
+<!-- end .app -->
+
 <!-- My Account Modal -->
 <div class="modal-backdrop" id="account-modal" style="display:none">
   <div class="modal" style="max-width:480px">
@@ -5248,21 +5251,10 @@
   ['login-email','login-password'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); }));
   ['reg-taxid','reg-company','reg-name','reg-email','reg-password'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key === 'Enter') doRegister(); }));
 
-  // Patch switchTab to handle new tabs
-  const _switchTab = switchTab;
-  switchTab = function(name){
-    document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-    ['editor','history','clients','products','org','members'].forEach(n => {
-      const el = $('tab-'+n);
-      if(el) el.style.display = name === n ? '' : 'none';
-    });
-    if(name === 'history') renderHistory();
-    if(name === 'clients') renderClientsList();
-    if(name === 'products') renderProductsList();
-    if(name === 'org') renderOrgSettings();
-    if(name === 'members') renderMembers();
-  };
-  // Re-bind tab buttons since some are new
+  // Note: switchTab is now defined as the canonical version above (handles 'settings' tab).
+  // Old patch that referenced 'org' and 'members' tabs was removed since they've been merged into 'settings'.
+
+  // Re-bind tab buttons (clone-replace trick removes any duplicate handlers)
   document.querySelectorAll('[data-tab]').forEach(b => {
     b.replaceWith(b.cloneNode(true));
   });
