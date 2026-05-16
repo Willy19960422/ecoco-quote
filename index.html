@@ -1625,12 +1625,26 @@
               <input type="text" id="settings-acct-display-name" />
             </div>
           </div>
+          <div class="grid-2" style="gap:12px">
+            <div class="field">
+              <label data-i18n="acct_title">職稱</label>
+              <input type="text" id="settings-acct-title" data-i18n-ph="acct_title_ph" placeholder="例如：業務代表" />
+            </div>
+            <div class="field">
+              <label data-i18n="acct_mobile">手機</label>
+              <input type="tel" id="settings-acct-mobile" inputmode="tel" data-i18n-ph="acct_mobile_ph" placeholder="例如：0912-345-678" />
+            </div>
+          </div>
+          <div class="field">
+            <label data-i18n="acct_line_id">Line ID</label>
+            <input type="text" id="settings-acct-line-id" data-i18n-ph="acct_line_id_ph" placeholder="例如：kuo-bd" />
+          </div>
           <div class="field">
             <label data-i18n="personal_signature_label">個人簽名檔（會接在公司簽名後）</label>
             <textarea id="settings-acct-signature" rows="5" data-i18n-ph="personal_signature_ph" placeholder="例如：&#10;郭先生 / 業務代表&#10;直撥：0912-345-678&#10;Line ID：kuo-bd" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:inherit; resize:vertical"></textarea>
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-top:6px; flex-wrap:wrap">
-              <small style="color:var(--text-3); font-size:11px; flex:1; min-width:200px" data-i18n="personal_signature_hint">您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。</small>
-              <button type="button" class="btn" id="settings-personal-signature-insert-default" style="padding:6px 12px; font-size:12px; flex-shrink:0; display:none" data-i18n="insert_default_signature">套用預設範本</button>
+              <small style="color:var(--text-3); font-size:11px; flex:1; min-width:200px" data-i18n="personal_signature_hint">系統會自動將「顯示名稱／職稱／手機／Line ID／Email」拼成簽名。也可以手動編輯這裡，會優先使用您手動填寫的版本。</small>
+              <button type="button" class="btn" id="settings-personal-signature-insert-default" style="padding:6px 12px; font-size:12px; flex-shrink:0" data-i18n="insert_default_signature">套用預設範本</button>
             </div>
           </div>
           <div style="text-align:right">
@@ -2046,10 +2060,16 @@
       org_signature_ph: '例如：\n大坑科技股份有限公司\n網址：www.dakeng.com.tw\n地址：台南市東區XXX路123號',
       org_signature_hint: '這是公司共用的簽名，所有業務寄報價單時都會附上。業務本人的聯絡資訊請至「我的帳號」設定。',
       insert_default_signature: '套用預設範本',
+      acct_title: '職稱',
+      acct_title_ph: '例如：業務代表',
+      acct_mobile: '手機',
+      acct_mobile_ph: '例如：0912-345-678',
+      acct_line_id: 'Line ID',
+      acct_line_id_ph: '例如：kuo-bd',
       org_signature_member_note: '由管理員設定。您寄送報價單時會自動帶入此簽名。',
       personal_signature_label: '個人簽名檔（會接在公司簽名後）',
       personal_signature_ph: '例如：\n郭先生 / 業務代表\n直撥：0912-345-678\nLine ID：kuo-bd',
-      personal_signature_hint: '您的個人聯絡資訊，例如手機、Line ID 等。寄報價單時會接在公司簽名之後。',
+      personal_signature_hint: '系統會自動將「顯示名稱／職稱／手機／Line ID／Email」拼成簽名。也可以手動編輯這裡，會優先使用您手動填寫的版本。',
       change_password: '修改密碼',
       profile_updated: '個人資料已更新',
       password_changed: '密碼已成功更新',
@@ -2219,10 +2239,16 @@
       org_signature_ph: 'e.g.\nDakeng Tech Co., Ltd.\nWebsite: www.dakeng.com.tw\nAddress: ...',
       org_signature_hint: 'This is the company-wide signature, automatically added when anyone sends a quote. Personal contact info goes in "My Account".',
       insert_default_signature: 'Insert Default',
+      acct_title: 'Job Title',
+      acct_title_ph: 'e.g. Sales Representative',
+      acct_mobile: 'Mobile',
+      acct_mobile_ph: 'e.g. 0912-345-678',
+      acct_line_id: 'Line ID',
+      acct_line_id_ph: 'e.g. kuo-bd',
       org_signature_member_note: 'Set by admin. This will be auto-appended when you send quotes.',
       personal_signature_label: 'Personal Signature (appended after company signature)',
       personal_signature_ph: 'e.g.\nKuo / Sales Representative\nMobile: 0912-345-678\nLine ID: kuo-bd',
-      personal_signature_hint: 'Your personal contact info (mobile, Line ID, etc). Added after the company signature when sending quotes.',
+      personal_signature_hint: 'Auto-built from your name, title, mobile, Line ID, and email. You can also edit manually here — your manual version takes priority.',
       change_password: 'Change Password',
       profile_updated: 'Profile updated',
       password_changed: 'Password changed successfully',
@@ -3044,16 +3070,23 @@
     if(currentUser && currentMember){
       const emailEl = $('settings-acct-email');
       const nameEl = $('settings-acct-display-name');
+      const titleEl = $('settings-acct-title');
+      const mobileEl = $('settings-acct-mobile');
+      const lineEl = $('settings-acct-line-id');
       const sigEl = $('settings-acct-signature');
       if(emailEl) emailEl.value = currentUser.email || '';
       if(nameEl) nameEl.value = currentMember.display_name || '';
+      if(titleEl) titleEl.value = currentMember.title || '';
+      if(mobileEl) mobileEl.value = currentMember.mobile || '';
+      if(lineEl) lineEl.value = currentMember.line_id || '';
       if(sigEl){
         const savedSig = currentMember.signature_personal || '';
         sigEl.value = savedSig;
         const tpl = buildDefaultPersonalSignature();
         sigEl.placeholder = tpl || (state.lang === 'en' ? 'Enter your personal signature here' : '在此輸入個人簽名');
+        // "Insert Default" button is always shown if we have a template (user may want to refresh it)
         const btn = $('settings-personal-signature-insert-default');
-        if(btn) btn.style.display = (!savedSig && tpl) ? '' : 'none';
+        if(btn) btn.style.display = tpl ? '' : 'none';
       }
     }
   }
@@ -4001,8 +4034,18 @@
   function buildDefaultPersonalSignature(){
     if(!currentMember) return '';
     const lines = [];
-    if(currentMember.display_name) lines.push(currentMember.display_name);
+    // First line: name + title (e.g. "郭先生 / 業務代表")
+    const name = currentMember.display_name || '';
+    const title = currentMember.title || '';
+    if(name && title) lines.push(name + ' / ' + title);
+    else if(name) lines.push(name);
+    else if(title) lines.push(title);
+    // Mobile
+    if(currentMember.mobile) lines.push((state.lang === 'en' ? 'Mobile: ' : '直撥：') + currentMember.mobile);
+    // Email
     if(currentMember.email) lines.push('Email：' + currentMember.email);
+    // Line ID
+    if(currentMember.line_id) lines.push('Line ID：' + currentMember.line_id);
     return lines.join('\n');
   }
 
@@ -5199,17 +5242,35 @@
         toast(state.lang === 'en' ? 'Display name required' : '請填寫顯示名稱', 'error');
         return;
       }
+      const title = $('settings-acct-title').value.trim();
+      const mobile = $('settings-acct-mobile').value.trim();
+      const lineId = $('settings-acct-line-id').value.trim();
       const sig = $('settings-acct-signature').value;
       const btn = $('settings-btn-save-profile');
       btn.disabled = true;
       try {
         const { error } = await supa.from('members')
-          .update({ display_name: name, signature_personal: sig })
+          .update({ 
+            display_name: name, 
+            title: title || null,
+            mobile: mobile || null,
+            line_id: lineId || null,
+            signature_personal: sig 
+          })
           .eq('id', currentUser.id);
         if(error) throw error;
         currentMember.display_name = name;
+        currentMember.title = title;
+        currentMember.mobile = mobile;
+        currentMember.line_id = lineId;
         currentMember.signature_personal = sig;
         $('user-name').textContent = name;
+        // Refresh placeholder template (so it reflects new contact info)
+        const sigEl = $('settings-acct-signature');
+        if(sigEl){
+          const tpl = buildDefaultPersonalSignature();
+          sigEl.placeholder = tpl || (state.lang === 'en' ? 'Enter your personal signature here' : '在此輸入個人簽名');
+        }
         toast(state.lang === 'en' ? 'Profile saved' : '個人資料已儲存', 'success');
       } catch(e){
         toast((state.lang === 'en' ? 'Save failed: ' : '儲存失敗：') + (e.message || e), 'error');
@@ -5265,14 +5326,22 @@
   if(settingsPersonalSigBtn){
     settingsPersonalSigBtn.addEventListener('click', () => {
       const tpl = buildDefaultPersonalSignature();
-      if(tpl){
-        $('settings-acct-signature').value = tpl;
-        $('settings-acct-signature').focus();
-        settingsPersonalSigBtn.style.display = 'none';
-        toast(state.lang === 'en' ? 'Template inserted — edit as needed' : '已套用預設範本，可自行修改', 'success');
-      } else {
-        toast(state.lang === 'en' ? 'Fill in display name first' : '請先填寫顯示名稱', 'error');
+      if(!tpl){
+        toast(state.lang === 'en' ? 'Fill in name/title/mobile/Line ID first' : '請先填寫姓名／職稱／手機／Line ID', 'error');
+        return;
       }
+      const sigEl = $('settings-acct-signature');
+      const current = (sigEl.value || '').trim();
+      if(current){
+        // Already has content — ask before overwriting
+        const ok = confirm(state.lang === 'en'
+          ? 'Overwrite existing signature with the auto-generated template from your latest profile info?'
+          : '要用最新的個人資料覆蓋目前的簽名嗎？\n（按取消保留現有內容）');
+        if(!ok) return;
+      }
+      sigEl.value = tpl;
+      sigEl.focus();
+      toast(state.lang === 'en' ? 'Template inserted — edit as needed, then save' : '已套用預設範本，可自行修改後儲存', 'success');
     });
   }
 
