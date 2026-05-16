@@ -385,53 +385,123 @@
   /* History list */
   .history-list { display: flex; flex-direction: column; gap: 8px; }
 
-  /* Collapsible section (settings page) */
-  .collapsible { padding: 0; overflow: hidden; }
+  /* Collapsible section (settings page) — refined design */
+  .collapsible {
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+  }
+  /* Left color bar - each section has its own accent */
+  .collapsible::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    transition: width 0.2s ease;
+  }
+  .collapsible[data-collapse="settings-org"]::before { background: #0f6e56; }
+  .collapsible[data-collapse="settings-account"]::before { background: #3b82f6; }
+  .collapsible[data-collapse="settings-members"]::before { background: #d97706; }
+  .collapsible:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transform: translateY(-1px);
+  }
+  .collapsible:hover::before { width: 5px; }
+  .collapsible.expanded {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  }
+  .collapsible.expanded::before { width: 5px; }
+
   .collapse-header {
     width: 100%;
     background: transparent;
     border: 0;
-    padding: 16px 20px;
+    padding: 18px 20px 18px 26px;
     text-align: left;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     font-family: inherit;
     color: var(--text);
-    border-radius: var(--radius);
     transition: background-color 0.15s;
   }
-  .collapse-header:hover { background: var(--surface-2); }
-  .collapse-arrow {
-    font-size: 11px;
-    color: var(--text-2);
-    transition: transform 0.2s;
-    flex-shrink: 0;
-    width: 14px;
+  .collapse-header:hover {
+    background: var(--surface-2);
   }
-  .collapsible.expanded .collapse-arrow { transform: rotate(90deg); }
+  /* Circle icon container */
+  .collapse-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .collapsible[data-collapse="settings-org"] .collapse-icon { background: #e1f5ee; color: #0f6e56; }
+  .collapsible[data-collapse="settings-account"] .collapse-icon { background: #dbeafe; color: #3b82f6; }
+  .collapsible[data-collapse="settings-members"] .collapse-icon { background: #fed7aa; color: #d97706; }
+
+  .collapse-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
   .collapse-title {
     font-weight: 600;
     font-size: 15px;
-    flex-shrink: 0;
+    color: var(--text);
+    line-height: 1.3;
   }
   .collapse-desc {
     font-size: 12px;
     color: var(--text-3);
-    margin-left: auto;
-    text-align: right;
+    line-height: 1.4;
+  }
+  .collapse-arrow {
+    font-size: 14px;
+    color: var(--text-3);
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+    margin-left: 8px;
+    width: 20px;
+    text-align: center;
+  }
+  .collapsible.expanded .collapse-arrow {
+    transform: rotate(90deg);
+    color: var(--text);
   }
   .collapse-body {
-    padding: 4px 20px 20px;
+    padding: 4px 20px 20px 26px;
     border-top: 1px solid var(--border);
     margin-top: 0;
+    animation: collapseExpand 0.25s ease;
   }
+  @keyframes collapseExpand {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  /* Inner .card inside collapse-body should look flush */
+  .collapse-body > .card {
+    box-shadow: none;
+    border: 0;
+    background: transparent;
+    padding: 18px 0 0;
+    margin: 0;
+  }
+
   @media (max-width: 640px) {
-    .collapse-header { padding: 14px 14px; gap: 8px; flex-wrap: wrap; }
+    .collapse-header { padding: 14px 14px 14px 20px; gap: 10px; }
+    .collapse-icon { width: 32px; height: 32px; font-size: 16px; }
     .collapse-title { font-size: 14px; }
-    .collapse-desc { font-size: 11px; width: 100%; margin-left: 0; margin-top: 4px; text-align: left; padding-left: 22px; }
-    .collapse-body { padding: 4px 14px 14px; }
+    .collapse-desc { font-size: 11px; }
+    .collapse-body { padding: 4px 14px 14px 20px; }
   }
   .history-item {
     display: flex; justify-content: space-between;
@@ -1446,9 +1516,14 @@
     <!-- Section 1: Company Info (collapsible) -->
     <div class="card collapsible" data-collapse="settings-org">
       <button type="button" class="collapse-header" data-toggle="settings-org">
-        <span class="collapse-arrow">▶</span>
-        <span class="collapse-title" data-i18n="settings_org_title">公司資料</span>
-        <span class="collapse-desc" data-i18n="settings_org_desc">統編、地址、Logo、公司簽名檔</span>
+        <span class="collapse-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>
+        </span>
+        <span class="collapse-text">
+          <span class="collapse-title" data-i18n="settings_org_title">公司資料</span>
+          <span class="collapse-desc" data-i18n="settings_org_desc">統編、地址、Logo、公司簽名檔</span>
+        </span>
+        <span class="collapse-arrow">›</span>
       </button>
       <div class="collapse-body" id="collapse-body-settings-org" style="display:none">
     <div class="card">
@@ -1534,9 +1609,14 @@
     <!-- Section 2: My Account (collapsible) -->
     <div class="card collapsible" data-collapse="settings-account">
       <button type="button" class="collapse-header" data-toggle="settings-account">
-        <span class="collapse-arrow">▶</span>
-        <span class="collapse-title" data-i18n="settings_account_title">我的帳號</span>
-        <span class="collapse-desc" data-i18n="settings_account_desc">姓名、Email、個人簽名、修改密碼</span>
+        <span class="collapse-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+        <span class="collapse-text">
+          <span class="collapse-title" data-i18n="settings_account_title">我的帳號</span>
+          <span class="collapse-desc" data-i18n="settings_account_desc">姓名、Email、個人簽名、修改密碼</span>
+        </span>
+        <span class="collapse-arrow">›</span>
       </button>
       <div class="collapse-body" id="collapse-body-settings-account" style="display:none">
         <!-- My account form (mirrors account-modal but inline) -->
@@ -1589,10 +1669,15 @@
     <!-- Section 3: Members Management (admin only, collapsible) -->
     <div class="card collapsible" id="settings-members-section" data-collapse="settings-members" style="display:none">
       <button type="button" class="collapse-header" data-toggle="settings-members">
-        <span class="collapse-arrow">▶</span>
-        <span class="collapse-title" data-i18n="settings_members_title">成員管理</span>
-        <span class="collapse-desc" data-i18n="settings_members_desc">新增成員、待審核、組織成員</span>
-        <span id="pending-badge-settings" style="display:none; background:var(--danger); color:white; padding:1px 6px; border-radius:10px; font-size:10px; margin-left:6px"></span>
+        <span class="collapse-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </span>
+        <span class="collapse-text">
+          <span class="collapse-title" data-i18n="settings_members_title">成員管理</span>
+          <span class="collapse-desc" data-i18n="settings_members_desc">新增成員、待審核、組織成員</span>
+        </span>
+        <span id="pending-badge-settings" style="display:none; background:var(--danger); color:white; padding:1px 7px; border-radius:10px; font-size:10px; font-weight:600; margin-right:4px"></span>
+        <span class="collapse-arrow">›</span>
       </button>
       <div class="collapse-body" id="collapse-body-settings-members" style="display:none">
     <div class="card">
