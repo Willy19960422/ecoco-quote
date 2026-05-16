@@ -1187,7 +1187,20 @@
   <div id="tab-history" style="display:none">
     <div class="card">
       <p class="section-title"><span class="dot"></span><span data-i18n="history_title">歷史報價</span></p>
-      <input type="search" id="history-search" data-i18n-ph="search_ph" placeholder="搜尋客戶名、報價單號..." style="width:100%; padding:9px 12px; margin-bottom:12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px">
+      <!-- Status statistics bar -->
+      <div id="history-stats" style="font-size:13px; color:var(--text-2); margin-bottom:12px; padding:10px 14px; background:var(--surface-2); border-radius:var(--radius); line-height:1.8"></div>
+      <!-- Filter row -->
+      <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap">
+        <input type="search" id="history-search" data-i18n-ph="search_ph" placeholder="搜尋客戶名、報價單號..." style="flex:1; min-width:180px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px">
+        <select id="history-status-filter" style="padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; background:white">
+          <option value="all" data-i18n="status_all">全部狀態</option>
+          <option value="draft" data-i18n="status_draft">草稿</option>
+          <option value="sent" data-i18n="status_sent">已寄出</option>
+          <option value="accepted" data-i18n="status_accepted">已成交</option>
+          <option value="rejected" data-i18n="status_rejected">已拒絕</option>
+          <option value="expired" data-i18n="status_expired">已過期</option>
+        </select>
+      </div>
       <div id="history-list" class="history-list"></div>
     </div>
 
@@ -1567,6 +1580,8 @@
       subtotal: '小計', discount: '折扣', tax: '稅金', total: '總計',
       save: '儲存', new: '新報價單', print: '列印', pdf: '匯出 PDF',
       history_title: '歷史報價', no_history: '尚無儲存的報價單',
+      status_all: '全部狀態', status_draft: '草稿', status_sent: '已寄出', 
+      status_accepted: '已成交', status_rejected: '已拒絕', status_expired: '已過期',
       load: '載入', delete: '刪除',
       pick_from_book: '選取', save_to_book: '儲存',
       saved: '已儲存', deleted: '已刪除', loaded: '已載入',
@@ -1720,6 +1735,8 @@
       subtotal: 'Subtotal', discount: 'Discount', tax: 'Tax', total: 'Total',
       save: 'Save', new: 'New', print: 'Print', pdf: 'Export PDF',
       history_title: 'Saved Quotations', no_history: 'No saved quotations yet',
+      status_all: 'All', status_draft: 'Draft', status_sent: 'Sent',
+      status_accepted: 'Accepted', status_rejected: 'Rejected', status_expired: 'Expired',
       load: 'Load', delete: 'Delete',
       pick_from_book: 'Pick', save_to_book: 'Save',
       saved: 'Saved', deleted: 'Deleted', loaded: 'Loaded',
@@ -2084,7 +2101,9 @@
         discVal: parseFloat(q.disc_val)||0,
         taxRate: parseFloat(q.tax_rate)||0,
         total: parseFloat(q.total)||0,
-        dailySeq: q.daily_seq || null
+        dailySeq: q.daily_seq || null,
+        status: q.status || 'draft',
+        statusUpdatedAt: q.status_updated_at || null
       }));
       saveQuotes(local);
       setSyncing(false);
@@ -2110,7 +2129,9 @@
         disc_val: snap.discVal || 0,
         tax_rate: snap.taxRate || 0,
         total: snap.total || 0,
-        daily_seq: snap.dailySeq || null
+        daily_seq: snap.dailySeq || null,
+        status: snap.status || 'draft',
+        status_updated_at: new Date().toISOString()
       };
       const { error } = await supa.from('quotes').upsert(row);
       if(error) throw error;
@@ -2307,6 +2328,7 @@
     // Reset UUID for new quote
     currentQuoteUuid = uid();
     loadedClientSnapshot = null;  // not loaded from history → treat saves as fresh
+    window._currentQuoteStatus = 'draft';  // new quote starts as draft
     state.items = [{desc:'',qty:1,price:0}];
     $('quote-no').value = '';  // Empty until saved
     $('quote-date').value = todayStr(0);
@@ -2373,7 +2395,8 @@
       discVal: parseFloat($('disc-val').value)||0,
       taxRate: parseFloat($('tax-rate').value)||0,
       total: recalc().total,
-      dailySeq: (window._pendingDailySeq || null)
+      dailySeq: (window._pendingDailySeq || null),
+      status: window._currentQuoteStatus || 'draft'
     };
   }
 
@@ -2384,6 +2407,8 @@
   function loadSnapshot(q){
     // Restore UUID so re-saving updates the same row
     currentQuoteUuid = q.id || uid();
+    // Restore status (so subsequent save preserves it)
+    window._currentQuoteStatus = q.status || 'draft';
     $('currency').value = q.currency || 'TWD';
     $('quote-no').value = q.quoteNo || '';
     $('quote-date').value = q.quoteDate || todayStr(0);
@@ -2438,25 +2463,95 @@
     el._tid = setTimeout(() => el.className = 'toast', 2400);
   }
 
+  // Status helpers
+  const STATUS_LABELS_ZH = {
+    draft: '草稿', sent: '已寄出', accepted: '已成交', rejected: '已拒絕', expired: '已過期'
+  };
+  const STATUS_LABELS_EN = {
+    draft: 'Draft', sent: 'Sent', accepted: 'Accepted', rejected: 'Rejected', expired: 'Expired'
+  };
+  const STATUS_COLORS = {
+    draft:    { bg: '#f1efe8', text: '#777' },
+    sent:     { bg: '#dbeafe', text: '#1e40af' },
+    accepted: { bg: '#dcfce7', text: '#15803d' },
+    rejected: { bg: '#fee2e2', text: '#b91c1c' },
+    expired:  { bg: '#fef3c7', text: '#a16207' }
+  };
+  function statusLabel(s){
+    const labels = state.lang === 'en' ? STATUS_LABELS_EN : STATUS_LABELS_ZH;
+    return labels[s] || labels.draft;
+  }
+  function statusBadge(s){
+    const col = STATUS_COLORS[s] || STATUS_COLORS.draft;
+    return '<span class="status-badge" style="background:'+col.bg+';color:'+col.text+';padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap">'+escapeHtml(statusLabel(s))+'</span>';
+  }
+  // Compute effective status (auto-expire based on valid_until date)
+  function effectiveStatus(q){
+    if(q.status === 'accepted' || q.status === 'rejected') return q.status;
+    // If valid_until passed and not yet accepted/rejected → show as expired
+    if(q.validUntil){
+      const validDate = new Date(q.validUntil);
+      const today = new Date(); today.setHours(0,0,0,0);
+      if(validDate < today) return 'expired';
+    }
+    return q.status || 'draft';
+  }
+
   function renderHistory(){
     const list = $('history-list');
     const q = (($('history-search') && $('history-search').value) || '').toLowerCase();
-    const arr = loadQuotes()
+    const statusFilter = $('history-status-filter') ? $('history-status-filter').value : 'all';
+    let arr = loadQuotes()
       .filter(x => !q || ((x.quoteNo||'') + ' ' + ((x.to&&x.to.name)||'')).toLowerCase().includes(q))
       .sort((a,b) => (b.savedAt||'').localeCompare(a.savedAt||''));
+    // Apply status filter
+    if(statusFilter && statusFilter !== 'all'){
+      arr = arr.filter(x => effectiveStatus(x) === statusFilter);
+    }
+    // Render stats summary
+    const summaryEl = $('history-stats');
+    if(summaryEl){
+      const counts = { draft:0, sent:0, accepted:0, rejected:0, expired:0 };
+      const all = loadQuotes();
+      all.forEach(x => { counts[effectiveStatus(x)] = (counts[effectiveStatus(x)]||0) + 1; });
+      summaryEl.innerHTML =
+        '<span style="cursor:pointer" data-stat="all">'+(state.lang==='en'?'All':'全部')+' <strong>'+all.length+'</strong></span>'+
+        ' · <span style="cursor:pointer" data-stat="draft">'+statusLabel('draft')+' <strong>'+counts.draft+'</strong></span>'+
+        ' · <span style="cursor:pointer" data-stat="sent">'+statusLabel('sent')+' <strong>'+counts.sent+'</strong></span>'+
+        ' · <span style="cursor:pointer" data-stat="accepted">'+statusLabel('accepted')+' <strong style="color:#15803d">'+counts.accepted+'</strong></span>'+
+        ' · <span style="cursor:pointer" data-stat="rejected">'+statusLabel('rejected')+' <strong style="color:#b91c1c">'+counts.rejected+'</strong></span>'+
+        ' · <span style="cursor:pointer" data-stat="expired">'+statusLabel('expired')+' <strong style="color:#a16207">'+counts.expired+'</strong></span>';
+      summaryEl.querySelectorAll('[data-stat]').forEach(b => b.addEventListener('click', e => {
+        if($('history-status-filter')){
+          $('history-status-filter').value = e.currentTarget.dataset.stat;
+          renderHistory();
+        }
+      }));
+    }
     if(arr.length === 0){ list.innerHTML = '<div class="empty">'+t('no_history')+'</div>'; return; }
     list.innerHTML = '';
     arr.forEach(q => {
       const c = currencies[q.currency] || currencies.TWD;
       const totalStr = c.symbol + ' ' + (Math.round((q.total||0)*100)/100).toLocaleString();
+      const eff = effectiveStatus(q);
       const div = document.createElement('div');
       div.className = 'history-item';
       div.innerHTML =
         '<div class="history-meta">'+
-          '<strong>'+escapeHtml(q.quoteNo||q.id)+' — '+escapeHtml((q.to&&q.to.name)||'—')+'</strong>'+
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+            '<strong>'+escapeHtml(q.quoteNo||q.id)+'</strong>'+
+            statusBadge(eff)+
+            '<span style="color:var(--text-2)">— '+escapeHtml((q.to&&q.to.name)||'—')+'</span>'+
+          '</div>'+
           '<span>'+(q.savedAt||'').slice(0,10)+' · '+totalStr+'</span>'+
         '</div>'+
         '<div class="history-actions">'+
+          '<select class="btn" data-status-set="'+escapeHtml(q.id)+'" style="padding:6px 10px; font-size:12px">'+
+            '<option value="draft"'+(q.status==='draft'?' selected':'')+'>'+statusLabel('draft')+'</option>'+
+            '<option value="sent"'+(q.status==='sent'?' selected':'')+'>'+statusLabel('sent')+'</option>'+
+            '<option value="accepted"'+(q.status==='accepted'?' selected':'')+'>'+statusLabel('accepted')+'</option>'+
+            '<option value="rejected"'+(q.status==='rejected'?' selected':'')+'>'+statusLabel('rejected')+'</option>'+
+          '</select>'+
           '<button class="btn" data-load="'+escapeHtml(q.id)+'">'+t('load')+'</button>'+
           '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">'+t('delete')+'</button>'+
         '</div>';
@@ -2475,7 +2570,37 @@
       if(!confirm(t('confirm_delete'))) return;
       const id = e.currentTarget.dataset.del;
       saveQuotes(loadQuotes().filter(x => x.id !== id));
-      renderHistory(); toast(t('deleted'));
+      // Also delete from cloud
+      if(currentMember){
+        supa.from('quotes').delete().eq('id', id).then(({error}) => {
+          if(error) console.warn('cloud delete failed', error);
+        });
+      }
+      renderHistory();
+      toast(t('deleted'));
+    }));
+    // Status change dropdown
+    list.querySelectorAll('[data-status-set]').forEach(sel => sel.addEventListener('change', async e => {
+      const id = e.currentTarget.dataset.statusSet;
+      const newStatus = e.currentTarget.value;
+      const all = loadQuotes();
+      const i = all.findIndex(x => x.id === id);
+      if(i < 0) return;
+      all[i].status = newStatus;
+      all[i].statusUpdatedAt = new Date().toISOString();
+      saveQuotes(all);
+      // Update cloud (fire-and-forget)
+      if(currentMember){
+        try {
+          await supa.from('quotes')
+            .update({ status: newStatus, status_updated_at: new Date().toISOString() })
+            .eq('id', id);
+        } catch(err){ console.warn('cloud status update failed', err); }
+      }
+      toast(state.lang === 'en' 
+        ? 'Status changed to ' + statusLabel(newStatus) 
+        : '狀態已改為「' + statusLabel(newStatus) + '」', 'success');
+      renderHistory();
     }));
   }
 
@@ -3249,6 +3374,7 @@
   $('client-search').addEventListener('input', renderClientsList);
   $('product-search').addEventListener('input', renderProductsList);
   $('history-search').addEventListener('input', renderHistory);
+  $('history-status-filter').addEventListener('change', renderHistory);
   $('picker-search').addEventListener('input', renderPicker);
   $('picker-close').addEventListener('click', closePicker);
   $('picker-modal').addEventListener('click', e => {
@@ -3589,6 +3715,8 @@
       }
 
       // STEP 6: Save quote to history + push to cloud
+      // Mark as 'sent' since user just sent it
+      window._currentQuoteStatus = 'sent';
       const s = snapshot();
       if(window._pendingDailySeq){
         s.dailySeq = window._pendingDailySeq;
