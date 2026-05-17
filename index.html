@@ -1750,6 +1750,10 @@
             <label data-i18n="email">Email</label>
             <input type="email" id="org-email" inputmode="email" />
           </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label data-i18n="org_website">公司網站</label>
+            <input type="url" id="org-website" inputmode="url" data-i18n-ph="org_website_ph" placeholder="例如：www.dakeng.com.tw" />
+          </div>
         </div>
 
         <!-- Company Signature (admin editable) -->
@@ -2136,6 +2140,7 @@
   let currentUser = null;   // { id, email }
   let currentMember = null; // { id, org_id, email, display_name, role, approved }
   let currentOrg = null;    // { id, tax_id, name, address, phone, email, logo_url }
+  let orgMembersMap = {};   // { user_id: display_name } — for showing who created a quote
 
   const STORAGE_KEY = 'ecoco_quotes_v2';
   const LOGO_KEY = 'ecoco_logo_v2';
@@ -2246,6 +2251,8 @@
       profile: '個人資料',
       display_name: '顯示名稱',
       save_profile: '儲存個人資料',
+      org_website: '公司網站',
+      org_website_ph: '例如：www.dakeng.com.tw',
       org_signature_label: '公司簽名檔（寄送報價單時自動帶入信件底部）',
       org_signature_label_short: '公司簽名檔',
       org_signature_ph: '例如：\n大坑科技股份有限公司\n網址：www.dakeng.com.tw\n地址：台南市東區XXX路123號',
@@ -2304,7 +2311,7 @@
       create_account: '建立帳號',
       account_created: '✓ 帳號已建立！預設密碼：',
       account_created_hint: '請通知新成員此預設密碼，首次登入後需自行修改。',
-      err_email_exists: '此 Email 已存在帳號',
+      err_email_exists: '此 Email 已被使用（可能此人已在其他組織註冊過，請使用不同 Email）',
       err_create_failed: '建立失敗：',
       invite_desc: '輸入新員工 Email 與姓名後按「寄出邀請」，系統會自動寄一封邀請信給對方，對方點連結註冊即可加入此組織（首次註冊後需管理員核准）。',
       new_member_email: '新成員 Email',
@@ -2425,6 +2432,8 @@
       profile: 'Profile',
       display_name: 'Display Name',
       save_profile: 'Save Profile',
+      org_website: 'Company Website',
+      org_website_ph: 'e.g. www.dakeng.com.tw',
       org_signature_label: 'Company Signature (auto-appended to quote emails)',
       org_signature_label_short: 'Company Signature',
       org_signature_ph: 'e.g.\nDakeng Tech Co., Ltd.\nWebsite: www.dakeng.com.tw\nAddress: ...',
@@ -2483,7 +2492,7 @@
       create_account: 'Create Account',
       account_created: '✓ Account created! Default password: ',
       account_created_hint: 'Please inform the new member of this default password; they should change it after first login.',
-      err_email_exists: 'An account with this email already exists',
+      err_email_exists: 'This email is already registered (possibly in another organization). Please use a different email.',
       err_create_failed: 'Create failed: ',
       invite_desc: 'Enter new employee email and name, then click "Send Invite". The system will auto-send an invitation email. After they register via the link, the admin needs to approve them once.',
       new_member_email: 'New Member Email',
@@ -2699,7 +2708,19 @@
   function loadQuotes(){
     if(!currentMember) return [];
     const key = 'ecoco_quotes_' + currentMember.org_id;
-    const r = safeGet(key); if(r){ try { return JSON.parse(r); } catch(e){} } return [];
+    const r = safeGet(key);
+    let all = [];
+    if(r){ try { all = JSON.parse(r); } catch(e){} }
+    // Privacy filter: drafts are personal (only creator sees them); other statuses are org-wide visible
+    const myId = currentUser && currentUser.id;
+    return all.filter(q => {
+      // Non-draft: visible to everyone in org
+      if((q.status || 'draft') !== 'draft') return true;
+      // Draft: only visible to creator
+      // (Legacy quotes without createdBy fall back to current user — assume they're theirs)
+      if(!q.createdBy) return true;
+      return q.createdBy === myId;
+    });
   }
   function saveQuotes(a){
     if(!currentMember) return;
@@ -2732,7 +2753,8 @@
         total: parseFloat(q.total)||0,
         dailySeq: q.daily_seq || null,
         status: q.status || 'draft',
-        statusUpdatedAt: q.status_updated_at || null
+        statusUpdatedAt: q.status_updated_at || null,
+        createdBy: q.created_by || null
       }));
       saveQuotes(local);
       setSyncing(false);
@@ -2960,6 +2982,7 @@
     currentQuoteUuid = uid();
     loadedClientSnapshot = null;  // not loaded from history → treat saves as fresh
     window._currentQuoteStatus = 'draft';  // new quote starts as draft
+    window._currentQuoteCreatedBy = (currentUser && currentUser.id) || null;
     state.items = [{desc:'',qty:1,price:0}];
     $('quote-no').value = '';  // Empty until saved
     $('quote-date').value = todayStr(0);
@@ -3027,7 +3050,8 @@
       taxRate: parseFloat($('tax-rate').value)||0,
       total: recalc().total,
       dailySeq: (window._pendingDailySeq || null),
-      status: window._currentQuoteStatus || 'draft'
+      status: window._currentQuoteStatus || 'draft',
+      createdBy: window._currentQuoteCreatedBy || (currentUser && currentUser.id) || null
     };
   }
 
@@ -3040,6 +3064,7 @@
     currentQuoteUuid = q.id || uid();
     // Restore status (so subsequent save preserves it)
     window._currentQuoteStatus = q.status || 'draft';
+    window._currentQuoteCreatedBy = q.createdBy || null;
     $('currency').value = q.currency || 'TWD';
     $('quote-no').value = q.quoteNo || '';
     $('quote-date').value = q.quoteDate || todayStr(0);
@@ -3220,9 +3245,11 @@
   function refreshDraftBadge(){
     const badge = $('draft-count-badge');
     if(!badge) return;
-    const draftCount = loadQuotes().filter(q => effectiveStatus(q) === 'draft').length;
-    if(draftCount > 0){
-      badge.textContent = draftCount;
+    const all = loadQuotes();
+    const drafts = all.filter(q => effectiveStatus(q) === 'draft');
+    console.log('[refreshDraftBadge] total quotes:', all.length, 'drafts:', drafts.length, 'all statuses:', all.map(q => ({no: q.quoteNo, status: q.status, eff: effectiveStatus(q)})));
+    if(drafts.length > 0){
+      badge.textContent = drafts.length;
       badge.style.display = '';
     } else {
       badge.style.display = 'none';
@@ -3268,12 +3295,25 @@
     const c = currencies[q.currency] || currencies.TWD;
     const totalStr = c.symbol + ' ' + (Math.round((q.total||0)*100)/100).toLocaleString();
     const eff = effectiveStatus(q);
+    // Show creator name if it's someone else
+    const myId = currentUser && currentUser.id;
+    const creatorId = q.createdBy;
+    let creatorBadge = '';
+    if(creatorId && creatorId !== myId){
+      const creatorName = orgMembersMap[creatorId] || (state.lang === 'en' ? 'Other member' : '其他成員');
+      creatorBadge = '<span style="font-size:11px; color:var(--text-3); margin-left:4px">'+
+        (state.lang === 'en' ? 'by ' : '由 ')+
+        escapeHtml(creatorName)+
+        (state.lang === 'en' ? '' : ' 建立')+
+        '</span>';
+    }
     return '<div class="history-item">'+
       '<div class="history-meta">'+
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
           '<strong>'+escapeHtml(q.quoteNo||q.id)+'</strong>'+
           statusBadge(eff)+
           '<span style="color:var(--text-2)">— '+escapeHtml((q.to&&q.to.name)||'—')+'</span>'+
+          creatorBadge+
         '</div>'+
         '<span>'+(q.savedAt||'').slice(0,10)+' · '+totalStr+'</span>'+
       '</div>'+
@@ -4447,12 +4487,13 @@
     if(currentOrg && currentOrg.name) lines.push(currentOrg.name);
 
     // 3. Contact lines — all using 全形冒號 for visual alignment in CJK
-    // Order: Tel → Mobile → Email → Address → Line ID
-    if(currentOrg && currentOrg.phone) lines.push((isEn ? 'Tel:' : '電話:') + currentOrg.phone);
-    if(currentMember && currentMember.mobile) lines.push((isEn ? 'Mobile:' : '手機:') + currentMember.mobile);
-    if(currentMember && currentMember.email) lines.push((isEn ? 'Email:' : '信箱:') + currentMember.email);
-    if(currentOrg && currentOrg.address) lines.push((isEn ? 'Address:' : '地址:') + currentOrg.address);
-    if(currentMember && currentMember.line_id) lines.push('Line ID:' + currentMember.line_id);
+    // Order: Tel → Mobile → Email → Address → Website → Line ID
+    if(currentOrg && currentOrg.phone) lines.push((isEn ? 'Tel：' : '電話：') + currentOrg.phone);
+    if(currentMember && currentMember.mobile) lines.push((isEn ? 'Mobile：' : '手機：') + currentMember.mobile);
+    if(currentMember && currentMember.email) lines.push((isEn ? 'Email：' : '信箱：') + currentMember.email);
+    if(currentOrg && currentOrg.address) lines.push((isEn ? 'Address：' : '地址：') + currentOrg.address);
+    if(currentOrg && currentOrg.website) lines.push((isEn ? 'Website：' : '網站：') + currentOrg.website);
+    if(currentMember && currentMember.line_id) lines.push('Line ID：' + currentMember.line_id);
 
     return lines.join('\n');
   }
@@ -4463,10 +4504,11 @@
     const lines = [];
     const isEn = state.lang === 'en';
     if(currentOrg.name) lines.push(currentOrg.name);
-    if(currentOrg.phone) lines.push((isEn ? 'Tel:' : '電話:') + currentOrg.phone);
-    if(currentOrg.email) lines.push((isEn ? 'Email:' : '信箱:') + currentOrg.email);
-    if(currentOrg.address) lines.push((isEn ? 'Address:' : '地址:') + currentOrg.address);
-    if(currentOrg.tax_id) lines.push((isEn ? 'Tax ID:' : '統一編號:') + currentOrg.tax_id);
+    if(currentOrg.phone) lines.push((isEn ? 'Tel：' : '電話：') + currentOrg.phone);
+    if(currentOrg.email) lines.push((isEn ? 'Email：' : '信箱：') + currentOrg.email);
+    if(currentOrg.address) lines.push((isEn ? 'Address：' : '地址：') + currentOrg.address);
+    if(currentOrg.website) lines.push((isEn ? 'Website：' : '網站：') + currentOrg.website);
+    if(currentOrg.tax_id) lines.push((isEn ? 'Tax ID：' : '統一編號：') + currentOrg.tax_id);
     return lines.join('\n');
   }
 
@@ -4481,9 +4523,9 @@
     if(name && title) lines.push(name + ' ' + title);
     else if(name) lines.push(name);
     else if(title) lines.push(title);
-    if(currentMember.mobile) lines.push((isEn ? 'Mobile:' : '手機:') + currentMember.mobile);
-    if(currentMember.email) lines.push((isEn ? 'Email:' : '信箱:') + currentMember.email);
-    if(currentMember.line_id) lines.push('Line ID:' + currentMember.line_id);
+    if(currentMember.mobile) lines.push((isEn ? 'Mobile：' : '手機：') + currentMember.mobile);
+    if(currentMember.email) lines.push((isEn ? 'Email：' : '信箱：') + currentMember.email);
+    if(currentMember.line_id) lines.push('Line ID：' + currentMember.line_id);
     return lines.join('\n');
   }
 
@@ -4893,6 +4935,14 @@
     const { data: orgs } = await supa.from('organizations').select('*').eq('id', currentMember.org_id);
     currentOrg = orgs && orgs[0] ? orgs[0] : null;
 
+    // Fetch all org members (for showing "created by" on quotes)
+    try {
+      const { data: allMembers } = await supa.from('members').select('id, display_name, email')
+        .eq('org_id', currentMember.org_id);
+      orgMembersMap = {};
+      (allMembers || []).forEach(m => { orgMembersMap[m.id] = m.display_name || m.email || ''; });
+    } catch(e){ console.warn('Failed to load org members:', e); }
+
     // Display user info
     $('user-name').textContent = currentMember.display_name || currentMember.email;
     $('user-role').textContent = currentMember.role === 'admin' ? t('role_admin') : t('role_member');
@@ -5017,6 +5067,7 @@
     $('org-address').value = currentOrg.address || '';
     $('org-phone').value = currentOrg.phone || '';
     $('org-email').value = currentOrg.email || '';
+    $('org-website').value = currentOrg.website || '';
 
     // Logo: admin sees editable section, member sees readonly note
     const isAdmin = currentMember && currentMember.role === 'admin';
@@ -5081,6 +5132,7 @@
         address: $('org-address').value.trim(),
         phone: $('org-phone').value.trim(),
         email: $('org-email').value.trim(),
+        website: $('org-website').value.trim(),
         signature_template: $('org-signature').value
       };
       const { error } = await supa.from('organizations').update(updates).eq('id', currentOrg.id);
@@ -5089,25 +5141,23 @@
       setSyncing(false);
       // Update topbar company name immediately
       if(updates.name){ $('topbar-company-name').textContent = updates.name; }
-      // Visible success
-      btn.innerHTML = '' + (state.lang === 'en' ? 'Saved!' : '已儲存！');
-      btn.style.background = 'var(--accent)';
-      btn.style.color = 'white';
-      btn.style.borderColor = 'var(--accent)';
-      toast(state.lang === 'en' ? 'Basic info saved to cloud' : '基本資料已儲存至雲端', 'success');
-      setTimeout(() => {
-        btn.innerHTML = origText;
-        btn.style.background = '';
-        btn.style.color = '';
-        btn.style.borderColor = '';
-        btn.disabled = false;
-      }, 2000);
+      btn.innerHTML = origText;
+      btn.disabled = false;
+      popup(
+        state.lang === 'en' ? 'Saved' : '儲存成功',
+        state.lang === 'en' ? 'Company info updated successfully.' : '公司資料已更新',
+        'success'
+      );
     } catch(e){
       console.error(e);
       setSyncing(false, e);
       btn.innerHTML = origText;
       btn.disabled = false;
-      alert(state.lang === 'en' ? 'Save failed: ' + e.message : '儲存失敗：' + e.message);
+      popup(
+        state.lang === 'en' ? 'Save Failed' : '儲存失敗',
+        e.message || String(e),
+        'error'
+      );
     }
   }
 
@@ -5133,6 +5183,9 @@
     if(!currentMember || currentMember.role !== 'admin') return;
     const { data: members } = await supa.from('members').select('*').eq('org_id', currentMember.org_id);
     const all = members || [];
+    // Update id → name map (used by history items to show creator name)
+    orgMembersMap = {};
+    all.forEach(m => { orgMembersMap[m.id] = m.display_name || m.email || ''; });
     const pending = all.filter(m => !m.approved);
     const active = all.filter(m => m.approved);
 
