@@ -4243,14 +4243,20 @@
   //   電話:xxx
   //   地址
   //   Line ID:xxx (only if filled)
+  // Build the unified auto-signature in the agreed format:
+  //   業務名 職稱       ← person first (highlighted by being on top)
+  //   (blank line)
+  //   公司名
+  //   電話：xxx
+  //   手機：xxx
+  //   信箱：xxx
+  //   地址：xxx
+  //   Line ID：xxx  (only if filled)
   function buildAutoSignature(){
     const lines = [];
     const isEn = state.lang === 'en';
 
-    // 1. Company name
-    if(currentOrg && currentOrg.name) lines.push(currentOrg.name);
-
-    // 2. Person + title (space-separated)
+    // 1. Person + title (top, as the headline)
     if(currentMember){
       const name = currentMember.display_name || '';
       const title = currentMember.title || '';
@@ -4259,30 +4265,33 @@
       else if(title) lines.push(title);
     }
 
-    // 3. Personal contact: Email then Mobile
-    if(currentMember && currentMember.email) lines.push('Email：' + currentMember.email);
-    if(currentMember && currentMember.mobile) lines.push((isEn ? 'Mobile: ' : '手機：') + currentMember.mobile);
+    // Blank line separator before company block
+    if(lines.length) lines.push('');
 
-    // 4. Company contact: Tel then Address
-    if(currentOrg && currentOrg.phone) lines.push((isEn ? 'Tel: ' : '電話:') + currentOrg.phone);
-    if(currentOrg && currentOrg.address) lines.push(currentOrg.address);
+    // 2. Company name
+    if(currentOrg && currentOrg.name) lines.push(currentOrg.name);
 
-    // 5. Line ID (last, only if filled)
+    // 3. Contact lines — all using 全形冒號 for visual alignment in CJK
+    // Order: Tel → Mobile → Email → Address → Line ID
+    if(currentOrg && currentOrg.phone) lines.push((isEn ? 'Tel:' : '電話:') + currentOrg.phone);
+    if(currentMember && currentMember.mobile) lines.push((isEn ? 'Mobile:' : '手機:') + currentMember.mobile);
+    if(currentMember && currentMember.email) lines.push((isEn ? 'Email:' : '信箱:') + currentMember.email);
+    if(currentOrg && currentOrg.address) lines.push((isEn ? 'Address:' : '地址:') + currentOrg.address);
     if(currentMember && currentMember.line_id) lines.push('Line ID:' + currentMember.line_id);
 
     return lines.join('\n');
   }
 
-  // Backward-compat: keep these for the "Insert Default Template" buttons.
   // Company signature template (admin edits if they want to override)
   function buildDefaultOrgSignature(){
     if(!currentOrg) return '';
     const lines = [];
+    const isEn = state.lang === 'en';
     if(currentOrg.name) lines.push(currentOrg.name);
-    if(currentOrg.address) lines.push(currentOrg.address);
-    if(currentOrg.phone) lines.push((state.lang === 'en' ? 'Tel: ' : '電話：') + currentOrg.phone);
-    if(currentOrg.email) lines.push('Email：' + currentOrg.email);
-    if(currentOrg.tax_id) lines.push((state.lang === 'en' ? 'Tax ID: ' : '統一編號：') + currentOrg.tax_id);
+    if(currentOrg.phone) lines.push((isEn ? 'Tel:' : '電話:') + currentOrg.phone);
+    if(currentOrg.email) lines.push((isEn ? 'Email:' : '信箱:') + currentOrg.email);
+    if(currentOrg.address) lines.push((isEn ? 'Address:' : '地址:') + currentOrg.address);
+    if(currentOrg.tax_id) lines.push((isEn ? 'Tax ID:' : '統一編號:') + currentOrg.tax_id);
     return lines.join('\n');
   }
 
@@ -4297,9 +4306,9 @@
     if(name && title) lines.push(name + ' ' + title);
     else if(name) lines.push(name);
     else if(title) lines.push(title);
-    if(currentMember.email) lines.push('Email：' + currentMember.email);
-    if(currentMember.mobile) lines.push((isEn ? 'Mobile: ' : '手機：') + currentMember.mobile);
-    if(currentMember.line_id) lines.push('Line ID：' + currentMember.line_id);
+    if(currentMember.mobile) lines.push((isEn ? 'Mobile:' : '手機:') + currentMember.mobile);
+    if(currentMember.email) lines.push((isEn ? 'Email:' : '信箱:') + currentMember.email);
+    if(currentMember.line_id) lines.push('Line ID:' + currentMember.line_id);
     return lines.join('\n');
   }
 
