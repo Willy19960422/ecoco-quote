@@ -5509,8 +5509,10 @@
   const settingsBtnSaveProfile = $('settings-btn-save-profile');
   if(settingsBtnSaveProfile){
     settingsBtnSaveProfile.addEventListener('click', async () => {
+      console.log('[Save Profile] clicked');
       const name = $('settings-acct-display-name').value.trim();
       if(!name){
+        console.warn('[Save Profile] no name');
         toast(state.lang === 'en' ? 'Display name required' : '請填寫顯示名稱', 'error');
         return;
       }
@@ -5518,10 +5520,13 @@
       const mobile = $('settings-acct-mobile').value.trim();
       const lineId = $('settings-acct-line-id').value.trim();
       const sig = $('settings-acct-signature').value;
+      console.log('[Save Profile] name=', name, 'title=', title, 'mobile=', mobile, 'lineId=', lineId);
+      console.log('[Save Profile] currentUser:', currentUser && currentUser.id);
       const btn = $('settings-btn-save-profile');
       btn.disabled = true;
       try {
-        const { error } = await supa.from('members')
+        console.log('[Save Profile] calling supabase update...');
+        const { data, error } = await supa.from('members')
           .update({ 
             display_name: name, 
             title: title || null,
@@ -5529,8 +5534,13 @@
             line_id: lineId || null,
             signature_personal: sig 
           })
-          .eq('id', currentUser.id);
+          .eq('id', currentUser.id)
+          .select();
+        console.log('[Save Profile] update result data=', data, 'error=', error);
         if(error) throw error;
+        if(!data || data.length === 0){
+          throw new Error('No row updated. Check RLS policy on members table.');
+        }
         currentMember.display_name = name;
         currentMember.title = title;
         currentMember.mobile = mobile;
@@ -5543,9 +5553,14 @@
           const tpl = buildDefaultPersonalSignature();
           sigEl.placeholder = tpl || (state.lang === 'en' ? 'Enter your personal signature here' : '在此輸入個人簽名');
         }
+        console.log('[Save Profile] success');
         toast(state.lang === 'en' ? 'Profile saved' : '個人資料已儲存', 'success');
       } catch(e){
-        toast((state.lang === 'en' ? 'Save failed: ' : '儲存失敗：') + (e.message || e), 'error');
+        console.error('[Save Profile] failed:', e);
+        const errMsg = (state.lang === 'en' ? 'Save failed: ' : '儲存失敗：') + (e.message || e);
+        toast(errMsg, 'error');
+        // Also alert as fallback in case toast is hidden
+        alert(errMsg);
       } finally {
         btn.disabled = false;
       }
