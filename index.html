@@ -600,55 +600,43 @@
 
   /* Toast */
   .toast {
-    position: fixed; top: 24px; left: 50%;
-    transform: translateX(-50%) translateY(-20px);
-    background: var(--text); color: white;
-    padding: 14px 24px 14px 20px;
-    border-radius: var(--radius);
-    font-size: 15px; font-weight: 500;
-    opacity: 0; pointer-events: none;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    z-index: 1000;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08);
-    max-width: 90%;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-left: 4px solid currentColor;
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    margin-left: -180px;     /* center via fixed width approach (more reliable than transform) */
+    min-width: 240px;
+    max-width: 360px;
+    width: auto;
+    background: #1a1a1a;
+    color: white;
+    padding: 14px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.4;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 99999;          /* highest priority */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    text-align: center;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
   .toast.show {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
   }
-  .toast.success { 
-    background: #15803d; 
-    color: white;
-    border-left-color: #4ade80;
+  .toast.success { background: #15803d; }
+  .toast.error { background: #b91c1c; }
+  @media (max-width: 480px) {
+    .toast {
+      left: 16px;
+      right: 16px;
+      margin-left: 0;
+      min-width: 0;
+      max-width: none;
+    }
   }
-  .toast.error { 
-    background: #b91c1c; 
-    color: white;
-    border-left-color: #f87171;
-  }
-  .toast::before {
-    content: '';
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-  }
-  .toast.success::before {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>');
-  }
-  .toast.error::before {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>');
-  }
-  /* No icon for default toast */
-  .toast:not(.success):not(.error)::before { display: none; }
 
   /* Icons via simple unicode/CSS */
   .ico { font-style: normal; }
