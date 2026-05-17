@@ -2112,7 +2112,7 @@
       conf_total: '總金額',
       conf_attach: '附件',
       mail_subject_tpl: '【{{from}} 報價單】{{quoteNo}} — {{client}}',
-      mail_body_tpl: '{{client}} {{contact}}您好，\n\n感謝您的詢價，謹此附上報價單，詳細內容請參閱附件 PDF。\n\n報價單編號：{{quoteNo}}\n報價日期：{{date}}\n有效期至：{{validUntil}}\n總金額：{{total}}\n\n如有任何疑問或需要進一步說明，歡迎隨時與我聯繫。\n期待與您的合作，謝謝。',
+      mail_body_tpl: '{{client}} {{greeting}}，\n\n感謝您的詢價，謹此附上報價單，詳細內容請參閱附件 PDF。\n\n報價單編號：{{quoteNo}}\n報價日期：{{date}}\n有效期至：{{validUntil}}\n總金額：{{total}}\n\n如有任何疑問或需要進一步說明，歡迎隨時與我聯繫。\n期待與您的合作，謝謝。',
       sent_hint: '已開啟郵件草稿，請確認附件後送出',
       tab_clients: '客戶', tab_products: '品項',
       duplicate: '複製', search_ph: '搜尋客戶名、報價單號...',
@@ -2291,7 +2291,7 @@
       conf_total: 'Total',
       conf_attach: 'Attachment',
       mail_subject_tpl: '[{{from}} Quotation] {{quoteNo}} — {{client}}',
-      mail_body_tpl: 'Dear {{contact}},\n\nThank you for your inquiry. Please find attached our quotation for your review.\n\nQuote No.: {{quoteNo}}\nIssue Date: {{date}}\nValid Until: {{validUntil}}\nTotal Amount: {{total}}\n\nShould you have any questions or require further clarification, please do not hesitate to contact me.\n\nWe look forward to working with you.',
+      mail_body_tpl: 'Dear {{greeting}},\n\nThank you for your inquiry. Please find attached our quotation for your review.\n\nQuote No.: {{quoteNo}}\nIssue Date: {{date}}\nValid Until: {{validUntil}}\nTotal Amount: {{total}}\n\nShould you have any questions or require further clarification, please do not hesitate to contact me.\n\nWe look forward to working with you.',
       sent_hint: 'Mail draft opened. Attach the PDF and send.',
       tab_clients: 'Clients', tab_products: 'Items',
       duplicate: 'Duplicate', search_ph: 'Search by name, quote no...',
@@ -4214,16 +4214,67 @@
   }
 
   // Build the email signature block: company signature + personal signature
+  // Compose the full signature block.
+  // New design (B+A+B): everything in ONE block, no "---" divider.
+  // Order: company name → person + title → personal contact → company contact → Line ID (last)
+  // - If user has a custom signature_template / signature_personal, those override the auto-build.
+  // - Auto-build pulls from org + member data.
   function composeSignature(){
-    const orgSig = (currentOrg && currentOrg.signature_template || '').trim();
-    const personalSig = (currentMember && currentMember.signature_personal || '').trim();
-    const parts = [];
-    if(orgSig) parts.push(orgSig);
-    if(personalSig) parts.push(personalSig);
-    return parts.join('\n\n---\n\n');
+    const orgCustom = (currentOrg && currentOrg.signature_template || '').trim();
+    const personalCustom = (currentMember && currentMember.signature_personal || '').trim();
+
+    // If BOTH have custom content, glue them with a blank line (no divider)
+    if(orgCustom && personalCustom){
+      return orgCustom + '\n' + personalCustom;
+    }
+    // If only one is custom, use that one alone
+    if(orgCustom) return orgCustom;
+    if(personalCustom) return personalCustom;
+
+    // Otherwise auto-build the unified signature from org + member info
+    return buildAutoSignature();
   }
 
-  // Build a default signature template from organization basic info
+  // Build the unified auto-signature in the agreed format:
+  //   公司名
+  //   業務名 職稱
+  //   Email:xxx
+  //   手機:xxx
+  //   電話:xxx
+  //   地址
+  //   Line ID:xxx (only if filled)
+  function buildAutoSignature(){
+    const lines = [];
+    const isEn = state.lang === 'en';
+
+    // 1. Company name
+    if(currentOrg && currentOrg.name) lines.push(currentOrg.name);
+
+    // 2. Person + title (space-separated)
+    if(currentMember){
+      const name = currentMember.display_name || '';
+      const title = currentMember.title || '';
+      if(name && title) lines.push(name + ' ' + title);
+      else if(name) lines.push(name);
+      else if(title) lines.push(title);
+    }
+
+    // 3. Personal contact: Email then Mobile
+    if(currentMember && currentMember.email) lines.push('Email：' + currentMember.email);
+    if(currentMember && currentMember.mobile) lines.push((isEn ? 'Mobile: ' : '手機：') + currentMember.mobile);
+
+    // 4. Company contact: Tel then Address
+    if(currentOrg && currentOrg.phone) lines.push((isEn ? 'Tel: ' : '電話:') + currentOrg.phone);
+    if(currentOrg && currentOrg.address) lines.push(currentOrg.address);
+
+    // 5. Line ID (last, only if filled)
+    if(currentMember && currentMember.line_id) lines.push('Line ID:' + currentMember.line_id);
+
+    return lines.join('\n');
+  }
+
+  // Backward-compat: keep these for the "Insert Default Template" buttons.
+  // Company signature template (admin edits if they want to override)
   function buildDefaultOrgSignature(){
     if(!currentOrg) return '';
     const lines = [];
@@ -4235,21 +4286,19 @@
     return lines.join('\n');
   }
 
-  // Build a default personal signature from member info
+  // Personal signature template (user edits if they want to override)
+  // Matches the unified auto-build format so users see what they'll get
   function buildDefaultPersonalSignature(){
     if(!currentMember) return '';
     const lines = [];
-    // First line: name + title (e.g. "郭先生 / 業務代表")
+    const isEn = state.lang === 'en';
     const name = currentMember.display_name || '';
     const title = currentMember.title || '';
-    if(name && title) lines.push(name + ' / ' + title);
+    if(name && title) lines.push(name + ' ' + title);
     else if(name) lines.push(name);
     else if(title) lines.push(title);
-    // Mobile
-    if(currentMember.mobile) lines.push((state.lang === 'en' ? 'Mobile: ' : '手機：') + currentMember.mobile);
-    // Email
     if(currentMember.email) lines.push('Email：' + currentMember.email);
-    // Line ID
+    if(currentMember.mobile) lines.push((isEn ? 'Mobile: ' : '手機：') + currentMember.mobile);
     if(currentMember.line_id) lines.push('Line ID：' + currentMember.line_id);
     return lines.join('\n');
   }
@@ -4257,10 +4306,17 @@
   function buildMailContext(){
     const calc = recalc();
     const sym = curSym();
+    // Build greeting: if contact name is provided, use it (e.g. "王小姐 您好")
+    // If not, use a generic greeting that doesn't duplicate "您"
+    const contactName = $('to-contact').value.trim();
+    const greeting = contactName 
+      ? contactName + (state.lang==='en' ? '' : '您好')
+      : (state.lang==='en' ? 'Sir/Madam' : '您好');
     return {
       quoteNo: $('quote-no').value || '',
       client: $('to-name').value || (state.lang==='en' ? 'Sir/Madam' : '貴公司'),
-      contact: $('to-contact').value || (state.lang==='en' ? 'Sir/Madam' : '您'),
+      contact: '',           // legacy (template still has placeholder, kept for compat)
+      greeting: greeting,    // new: full greeting line
       date: $('quote-date').value || '',
       validUntil: $('valid-until').value || '',
       total: sym + ' ' + fmt(calc.total),
