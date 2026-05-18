@@ -1744,6 +1744,10 @@
           <label data-i18n="address">地址</label>
           <input type="text" id="org-address" />
         </div>
+        <div class="field">
+          <label data-i18n="address_en">英文地址（寄給外國客戶時使用）</label>
+          <input type="text" id="org-address-en" data-i18n-ph="address_en_ph" placeholder="例如：No. 18-6, Dakeng Wei, Daken Village, Xinhua Dist., Tainan City 712" />
+        </div>
         <div class="grid-2" style="gap:12px">
           <div class="field">
             <label data-i18n="phone">電話</label>
@@ -2257,6 +2261,8 @@
       save_profile: '儲存個人資料',
       org_website: '公司網站',
       org_website_ph: '例如：www.dakeng.com.tw',
+      address_en: '英文地址（寄給外國客戶時使用）',
+      address_en_ph: '例如：No. 18-6, Dakeng Wei, Daken Village, Xinhua Dist., Tainan City 712',
       org_signature_label: '公司簽名檔（寄送報價單時自動帶入信件底部）',
       org_signature_label_short: '公司簽名檔',
       org_signature_ph: '例如：\n大坑科技股份有限公司\n網址：www.dakeng.com.tw\n地址：台南市東區XXX路123號',
@@ -2438,6 +2444,8 @@
       save_profile: 'Save Profile',
       org_website: 'Company Website',
       org_website_ph: 'e.g. www.dakeng.com.tw',
+      address_en: 'English Address (for foreign clients)',
+      address_en_ph: 'e.g. No. 18-6, Dakeng Wei, Daken Village, Xinhua Dist., Tainan City 712',
       org_signature_label: 'Company Signature (auto-appended to quote emails)',
       org_signature_label_short: 'Company Signature',
       org_signature_ph: 'e.g.\nDakeng Tech Co., Ltd.\nWebsite: www.dakeng.com.tw\nAddress: ...',
@@ -3158,7 +3166,7 @@
              :                       '#1a1a1a';
     el.style.cssText = 
       'position:fixed;'+
-      'top:20px;'+
+      'top:70px;'+
       'left:50%;'+
       'transform:translateX(-50%);'+
       'background:'+bg+';'+
@@ -4882,10 +4890,14 @@
 
     // 3. Contact lines — all using 全形冒號 for visual alignment in CJK
     // Order: Tel → Mobile → Email → Address → Website → Line ID
-    if(currentOrg && currentOrg.phone) lines.push((isEn ? 'Tel：' : '電話：') + currentOrg.phone);
-    if(currentMember && currentMember.mobile) lines.push((isEn ? 'Mobile：' : '手機：') + currentMember.mobile);
+    // English mode: phone gets +886 prefix, address uses address_en if available
+    if(currentOrg && currentOrg.phone) lines.push((isEn ? 'Tel：' : '電話：') + formatPhoneForLang(currentOrg.phone, state.lang));
+    if(currentMember && currentMember.mobile) lines.push((isEn ? 'Mobile：' : '手機：') + formatPhoneForLang(currentMember.mobile, state.lang));
     if(currentMember && currentMember.email) lines.push((isEn ? 'Email：' : '信箱：') + currentMember.email);
-    if(currentOrg && currentOrg.address) lines.push((isEn ? 'Address：' : '地址：') + currentOrg.address);
+    if(currentOrg) {
+      const addr = pickAddressForLang(state.lang);
+      if(addr) lines.push((isEn ? 'Address：' : '地址：') + addr);
+    }
     if(currentOrg && currentOrg.website) lines.push((isEn ? 'Website：' : '網站：') + currentOrg.website);
     if(currentMember && currentMember.line_id) lines.push('Line ID：' + currentMember.line_id);
 
@@ -4898,9 +4910,12 @@
     const lines = [];
     const isEn = state.lang === 'en';
     if(currentOrg.name) lines.push(currentOrg.name);
-    if(currentOrg.phone) lines.push((isEn ? 'Tel：' : '電話：') + currentOrg.phone);
+    if(currentOrg.phone) lines.push((isEn ? 'Tel：' : '電話：') + formatPhoneForLang(currentOrg.phone, state.lang));
     if(currentOrg.email) lines.push((isEn ? 'Email：' : '信箱：') + currentOrg.email);
-    if(currentOrg.address) lines.push((isEn ? 'Address：' : '地址：') + currentOrg.address);
+    {
+      const addr = pickAddressForLang(state.lang);
+      if(addr) lines.push((isEn ? 'Address：' : '地址：') + addr);
+    }
     if(currentOrg.website) lines.push((isEn ? 'Website：' : '網站：') + currentOrg.website);
     if(currentOrg.tax_id) lines.push((isEn ? 'Tax ID：' : '統一編號：') + currentOrg.tax_id);
     return lines.join('\n');
@@ -5474,11 +5489,37 @@
   }
 
   // Auto-fill org info (company) + member info (salesperson) into "from" fields
+  // --- i18n helpers for sender info ---
+  // Convert local phone to international format for English audience
+  //   "06-595-0688" → "+886-6-595-0688"
+  //   "0912-345-678" → "+886-912-345-678"
+  //   Already starts with "+" → return as-is
+  function formatPhoneForLang(phone, lang){
+    if(!phone) return '';
+    const p = phone.trim();
+    if(lang !== 'en') return p;  // Chinese: keep as-is
+    if(p.startsWith('+')) return p;  // Already international
+    // Remove first leading 0 (Taiwan area code) and add +886
+    if(p.startsWith('0')){
+      return '+886-' + p.slice(1);
+    }
+    return p;
+  }
+
+  // Pick address based on language (uses address_en if filled, else falls back to address)
+  function pickAddressForLang(lang){
+    if(!currentOrg) return '';
+    if(lang === 'en' && currentOrg.address_en){
+      return currentOrg.address_en;
+    }
+    return currentOrg.address || '';
+  }
+
   function populateFromOrg(){
     if(!currentOrg) return;
     if(!$('from-name').value) $('from-name').value = currentOrg.name || '';
-    if(!$('from-address').value) $('from-address').value = currentOrg.address || '';
-    if(!$('from-phone').value) $('from-phone').value = currentOrg.phone || '';
+    if(!$('from-address').value) $('from-address').value = pickAddressForLang(state.lang);
+    if(!$('from-phone').value) $('from-phone').value = formatPhoneForLang(currentOrg.phone, state.lang);
     if(!$('from-tax').value) $('from-tax').value = currentOrg.tax_id || '';
     // The "from-email" is the salesperson's email (not the company's)
     if(currentMember){
@@ -5498,6 +5539,7 @@
       : (state.lang === 'en' ? '(not assigned)' : '（未分配）');
     $('org-name').value = currentOrg.name || '';
     $('org-address').value = currentOrg.address || '';
+    $('org-address-en').value = currentOrg.address_en || '';
     $('org-phone').value = currentOrg.phone || '';
     $('org-email').value = currentOrg.email || '';
     $('org-website').value = currentOrg.website || '';
@@ -5567,6 +5609,7 @@
       const updates = {
         name: $('org-name').value.trim(),
         address: $('org-address').value.trim(),
+        address_en: $('org-address-en').value.trim() || null,
         phone: $('org-phone').value.trim(),
         email: $('org-email').value.trim(),
         website: $('org-website').value.trim(),
@@ -6177,6 +6220,26 @@
       if(typeof renderItems === 'function') renderItems();
       if(typeof renderHistory === 'function') renderHistory();
       if(typeof renderClientsList === 'function') renderClientsList();
+      if(typeof renderProductsList === 'function') renderProductsList();
+      if(typeof renderSettingsPage === 'function') renderSettingsPage();
+      if(typeof updateEditorStatusBadge === 'function') updateEditorStatusBadge();
+      if(typeof refreshDraftBadge === 'function') refreshDraftBadge();
+      // Force-update from-phone and from-address for the new language
+      // (only update if the field currently matches the OLD-language version, so we don't overwrite manual edits)
+      if(currentOrg){
+        const oldPhoneZh = (currentOrg.phone || '').trim();
+        const oldPhoneEn = formatPhoneForLang(currentOrg.phone, 'en');
+        const curPhone = $('from-phone').value.trim();
+        if(curPhone === oldPhoneZh || curPhone === oldPhoneEn || !curPhone){
+          $('from-phone').value = formatPhoneForLang(currentOrg.phone, newLang);
+        }
+        const oldAddrZh = (currentOrg.address || '').trim();
+        const oldAddrEn = (currentOrg.address_en || '').trim();
+        const curAddr = $('from-address').value.trim();
+        if(curAddr === oldAddrZh || curAddr === oldAddrEn || !curAddr){
+          $('from-address').value = pickAddressForLang(newLang);
+        }
+      }
     });
   });
   $('account-close').addEventListener('click', closeAccountModal);
