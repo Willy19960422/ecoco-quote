@@ -4457,7 +4457,11 @@
     c.id = (i >= 0 && arr[i].id) ? arr[i].id : uid();
     if(i >= 0) arr[i] = c; else arr.push(c);
     saveClients(arr);
-    toast(t('saved_client'));
+    popup(
+      state.lang === 'en' ? 'Saved' : '儲存成功',
+      state.lang === 'en' ? 'Client saved.' : '客戶已儲存',
+      'success'
+    );
   }
 
   function renderClientsList(){
@@ -4624,7 +4628,13 @@
       if(i >= 0) arr[i] = c; else arr.push(c);
       saveClients(arr);
       renderClientsList();
-      toast(t('saved_client'));
+      closeEditor();
+      popup(
+        state.lang === 'en' ? 'Saved' : '儲存成功',
+        state.lang === 'en' ? 'Client saved.' : '客戶已儲存',
+        'success'
+      );
+      return;
     } else if(editMode === 'product'){
       const p = {
         id: editItem.id || uid(),
@@ -4644,7 +4654,13 @@
       if(i >= 0) arr[i] = p; else arr.push(p);
       saveProducts(arr);
       renderProductsList();
-      toast(t('saved_product'));
+      closeEditor();
+      popup(
+        state.lang === 'en' ? 'Saved' : '儲存成功',
+        state.lang === 'en' ? 'Item saved.' : '品項已儲存',
+        'success'
+      );
+      return;
     }
     closeEditor();
   }
@@ -6656,7 +6672,14 @@
       if(i >= 0) arr[i] = c; else arr.push(c);
       saveClients(arr);
       await pushClientToCloud(c);
-      renderClientsList(); toast(t('saved_client'), 'success');
+      renderClientsList();
+      closeEditor();
+      popup(
+        state.lang === 'en' ? 'Saved' : '儲存成功',
+        state.lang === 'en' ? 'Client saved.' : '客戶已儲存',
+        'success'
+      );
+      return;
     } else if(editMode === 'product'){
       const p = {
         id: editItem.id || uid(),
@@ -6669,7 +6692,14 @@
       if(i >= 0) arr[i] = p; else arr.push(p);
       saveProducts(arr);
       await pushProductToCloud(p);
-      renderProductsList(); toast(t('saved_product'), 'success');
+      renderProductsList();
+      closeEditor();
+      popup(
+        state.lang === 'en' ? 'Saved' : '儲存成功',
+        state.lang === 'en' ? 'Item saved.' : '品項已儲存',
+        'success'
+      );
+      return;
     }
     closeEditor();
   };
