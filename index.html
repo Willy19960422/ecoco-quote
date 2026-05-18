@@ -3530,7 +3530,6 @@
       }
       loadSnapshot(q);
       switchTab('editor');
-      toast(state.lang === 'en' ? 'Loaded quote ' + (q.quoteNo || '') : '已載入報價單 ' + (q.quoteNo || ''), 'success');
     }));
     // View: read-only popup (someone else's quotes)
     list.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', e => {
@@ -3559,7 +3558,6 @@
       }
       renderHistory();
       refreshDraftBadge();
-      toast(t('deleted'));
     }));
     list.querySelectorAll('[data-status-set]').forEach(sel => sel.addEventListener('change', async e => {
       const id = e.currentTarget.dataset.statusSet;
@@ -4488,7 +4486,6 @@
       if(c){
         applyClientToForm(c);
         switchTab('editor');
-        toast(state.lang === 'en' ? 'Client loaded: ' + c.name : '已載入客戶：' + c.name, 'success');
       }
     }));
     list.querySelectorAll('[data-edit-c]').forEach(b => b.addEventListener('click', e => {
@@ -4564,11 +4561,9 @@
       div.addEventListener('click', () => {
         if(pickerMode === 'client'){
           applyClientToForm(x);
-          toast(state.lang === 'en' ? 'Client loaded: ' + x.name : '已載入客戶：' + x.name, 'success');
         } else {
           state.items.push({ desc: x.name, qty: 1, price: x.price || 0 });
           renderItems();
-          toast(state.lang === 'en' ? 'Item added: ' + x.name : '已加入品項：' + x.name, 'success');
         }
         closePicker();
       });
@@ -6465,8 +6460,8 @@
   // --- Init ---
   $('lang').value = state.lang;
   applyI18n();
-  // Initial Editor state in case logged in
-  newQuote();
+  // Note: newQuote() is called after successful login in the session check below,
+  // no need to call it on page load (which runs even on login screen).
   const lg = loadLogo();
   if(lg) showLogo(lg);
 
@@ -6726,7 +6721,6 @@
         saveQuotes(loadQuotes().filter(x => x.id !== id));
         await deleteQuoteFromCloud(id);
         renderHistory();
-        toast(t('deleted'));
       });
     });
   };
