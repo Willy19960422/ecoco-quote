@@ -2729,6 +2729,8 @@
     if(!currentMember) return;
     const key = 'ecoco_quotes_' + currentMember.org_id;
     safeSet(key, JSON.stringify(a));
+    // Auto-refresh draft badge after every save — guarantees badge always reflects localStorage
+    if(typeof refreshDraftBadge === 'function') refreshDraftBadge();
   }
 
   async function syncQuotesFromCloud(){
@@ -3409,6 +3411,8 @@
   }
 
   function renderHistory(){
+    // Refresh badge first so top-right number is always accurate
+    if(typeof refreshDraftBadge === 'function') refreshDraftBadge();
     const list = $('history-list');
     const q = (($('history-search') && $('history-search').value) || '').toLowerCase();
     const statusFilter = $('history-status-filter') ? $('history-status-filter').value : 'all';
@@ -5125,6 +5129,9 @@
       syncClientsFromCloud(),
       syncProductsFromCloud()
     ]);
+
+    // Make sure badge reflects synced state
+    if(typeof refreshDraftBadge === 'function') refreshDraftBadge();
 
     // Initialize editor with org data pre-filled
     newQuote();
