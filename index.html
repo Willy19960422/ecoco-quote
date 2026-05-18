@@ -2530,9 +2530,11 @@
     try { localStorage.setItem(k,v); return true; }
     catch(e){
       if(e && e.name && (e.name === 'QuotaExceededError' || e.code === 22)){
-        alert(state.lang === 'en'
-          ? 'Storage full. Please export data and remove old quotes/logo.'
-          : '瀏覽器儲存空間已滿，請先匯出備份並移除舊資料或 Logo。');
+        popup(
+          state.lang === 'en' ? 'Storage Full' : '儲存空間已滿',
+          state.lang === 'en' ? 'Browser storage is full. Please export data and remove old quotes/logo.' : '瀏覽器儲存空間已滿，請先匯出備份並移除舊資料或 Logo。',
+          'error'
+        );
       }
       return false;
     }
@@ -3662,8 +3664,9 @@
     });
   }
 
-  // --- PDF Export via html2canvas (preserves CJK fonts) ---
-  // Generate PDF blob (shared between download & upload)
+  // --- PDF Export via html2canvas (image) + jsPDF text layer (selectable) ---
+  // Hybrid approach: snapshot is rendered as JPEG image, while a transparent text layer
+  // is added on top so users can select/copy/search the text.
   async function generatePdfBlob(){
     // Ensure Logo is available as base64 before building PDF DOM (CORS-safe)
     if(currentOrg && currentOrg.logo_url && !currentOrg.logo_base64){
@@ -3676,17 +3679,21 @@
     document.body.appendChild(node);
     try {
       // Wait for all images (especially Logo from Supabase Storage) to fully load
-      // Otherwise html2canvas may snapshot before image fetched → blank logo
       const images = node.querySelectorAll('img');
       await Promise.all(Array.from(images).map(img => {
         if(img.complete && img.naturalWidth > 0) return Promise.resolve();
         return new Promise(resolve => {
           img.onload = () => resolve();
           img.onerror = () => resolve();
-          // Safety timeout: don't block PDF for >3 seconds per image
           setTimeout(() => resolve(), 3000);
         });
       }));
+
+      // Get DOM bounding info BEFORE html2canvas (so we can map text positions)
+      const nodeRect = node.getBoundingClientRect();
+      const textItems = collectTextItems(node, nodeRect);
+
+      // Snapshot to canvas
       const canvas = await html2canvas(node, {
         scale: 2,
         backgroundColor: '#ffffff',
@@ -3702,21 +3709,154 @@
       const imgW = pageW;
       const imgH = canvas.height * imgW / canvas.width;
 
+      // Scale factor: DOM pixels → PDF points (jsPDF uses pt; 1pt ≈ DOM px at this width)
+      const scaleX = imgW / nodeRect.width;
+
       if(imgH <= pageH){
         pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+        drawTextLayer(pdf, textItems, scaleX, 0);
       } else {
-        let remaining = imgH;
+        // Multi-page: split image AND text layer
         let position = 0;
-        while(remaining > 0){
-          pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-          remaining -= pageH;
-          if(remaining > 0){ pdf.addPage(); position -= pageH; }
+        let pageIndex = 0;
+        while(position < imgH){
+          if(pageIndex > 0) pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, -position, imgW, imgH);
+          drawTextLayer(pdf, textItems, scaleX, position);
+          position += pageH;
+          pageIndex++;
         }
       }
       return pdf.output('blob');
     } finally {
       node.remove();
     }
+  }
+
+  // Walk the DOM and collect every visible text node + its bounding rect
+  // Returns array of { text, x, y, fontSize, color }
+  function collectTextItems(root, rootRect){
+    const items = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        const txt = node.nodeValue;
+        if(!txt || !txt.trim()) return NodeFilter.FILTER_REJECT;
+        // Skip if any ancestor has display:none / visibility:hidden
+        let p = node.parentElement;
+        while(p && p !== root){
+          const cs = window.getComputedStyle(p);
+          if(cs.display === 'none' || cs.visibility === 'hidden') return NodeFilter.FILTER_REJECT;
+          p = p.parentElement;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    let node;
+    while((node = walker.nextNode())){
+      const parent = node.parentElement;
+      if(!parent) continue;
+      const cs = window.getComputedStyle(parent);
+      const fontSize = parseFloat(cs.fontSize) || 12;
+
+      // Get the bounding rect of the text node via Range
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const rects = range.getClientRects();
+      // Each rect is one line of text — split text proportionally
+      const rawText = node.nodeValue;
+      const trimmedText = rawText.trim();
+      if(rects.length === 0 || !trimmedText) continue;
+
+      // Simple approach: one item per ClientRect (line)
+      // Distribute text across lines roughly by character count
+      if(rects.length === 1){
+        const r = rects[0];
+        items.push({
+          text: trimmedText,
+          x: r.left - rootRect.left,
+          y: r.top - rootRect.top,
+          width: r.width,
+          height: r.height,
+          fontSize: fontSize
+        });
+      } else {
+        // Multi-line: just push each rect with the rawText (jsPDF will fit)
+        // Use approximation: divide text by line count
+        const linesText = wrapTextByRects(trimmedText, rects);
+        for(let i = 0; i < rects.length; i++){
+          const r = rects[i];
+          items.push({
+            text: linesText[i] || '',
+            x: r.left - rootRect.left,
+            y: r.top - rootRect.top,
+            width: r.width,
+            height: r.height,
+            fontSize: fontSize
+          });
+        }
+      }
+    }
+    return items;
+  }
+
+  // Helper: distribute a single text node across multiple line rects (approximate)
+  function wrapTextByRects(text, rects){
+    // Approximate by character count proportional to rect width
+    const totalW = rects.length > 0 ? Array.from(rects).reduce((s, r) => s + r.width, 0) : 0;
+    if(totalW === 0) return rects.map(() => '');
+    const result = [];
+    let pos = 0;
+    for(let i = 0; i < rects.length; i++){
+      if(i === rects.length - 1){
+        result.push(text.slice(pos));
+      } else {
+        const ratio = rects[i].width / totalW;
+        const n = Math.max(1, Math.round(text.length * ratio));
+        result.push(text.slice(pos, pos + n));
+        pos += n;
+      }
+    }
+    return result;
+  }
+
+  // Draw the transparent text layer onto a jsPDF page
+  // textItems: from collectTextItems
+  // scale: DOM pixels → PDF points
+  // pageOffset: vertical offset for multi-page documents (DOM pixels)
+  function drawTextLayer(pdf, textItems, scale, pageOffset){
+    // jsPDF's default font (helvetica) doesn't render CJK glyphs, but the underlying
+    // PDF still encodes the Unicode characters. When users copy text from the PDF
+    // viewer, they get the original Chinese characters. The text is set to transparent
+    // (rendering mode 3 = invisible) so it doesn't visually conflict with the JPEG image.
+    pdf.saveGraphicsState();
+    // Rendering mode 3 = invisible text (still selectable & copyable)
+    if(pdf.internal && pdf.internal.write){
+      pdf.internal.write('3 Tr');
+    }
+    pdf.setFont('helvetica', 'normal');
+
+    for(const item of textItems){
+      if(!item.text) continue;
+      // Adjust Y for page offset (multi-page case)
+      const yDom = item.y - pageOffset;
+      if(yDom < 0 || yDom > pdf.internal.pageSize.getHeight() / scale) continue;
+
+      const xPt = item.x * scale;
+      // jsPDF text baseline is at the bottom-left by default; adjust for font metrics
+      // Use the line's baseline (~80% down from top of the rect)
+      const baselinePt = (yDom + item.height * 0.8) * scale;
+      const fontSizePt = item.fontSize * scale;
+
+      pdf.setFontSize(fontSizePt);
+      try {
+        pdf.text(item.text, xPt, baselinePt, { baseline: 'alphabetic' });
+      } catch(e){
+        // Fallback if some chars not supported
+      }
+    }
+
+    pdf.restoreGraphicsState();
   }
 
   async function exportPDF(){
@@ -3733,7 +3873,11 @@
       URL.revokeObjectURL(url);
     } catch(err){
       console.error(err);
-      alert('PDF export failed: ' + err.message);
+      popup(
+        state.lang === 'en' ? 'PDF Export Failed' : 'PDF 匯出失敗',
+        err.message || String(err),
+        'error'
+      );
     }
   }
 
@@ -3866,7 +4010,11 @@
   $('org-logo-slot').addEventListener('click', e => {
     if(e.target.id === 'org-logo-remove') return;
     if(!currentMember || currentMember.role !== 'admin'){
-      alert(state.lang === 'en' ? 'Only admin can change company logo' : '僅管理員可變更公司 Logo');
+      popup(
+        state.lang === 'en' ? 'Permission Denied' : '無權限',
+        state.lang === 'en' ? 'Only admin can change company logo.' : '僅管理員可變更公司 Logo',
+        'error'
+      );
       return;
     }
     $('org-logo-input').click();
@@ -3875,19 +4023,31 @@
   $('org-logo-input').addEventListener('change', e => {
     const f = e.target.files[0]; if(!f) return;
     if(!currentMember || currentMember.role !== 'admin'){
-      alert(state.lang === 'en' ? 'Only admin can change company logo' : '僅管理員可變更公司 Logo');
+      popup(
+        state.lang === 'en' ? 'Permission Denied' : '無權限',
+        state.lang === 'en' ? 'Only admin can change company logo.' : '僅管理員可變更公司 Logo',
+        'error'
+      );
       e.target.value = '';
       return;
     }
     if(!f.type.startsWith('image/')){
-      alert(state.lang === 'en' ? 'Please select an image file' : '請選擇圖片檔案');
+      popup(
+        state.lang === 'en' ? 'Invalid File' : '檔案格式不符',
+        state.lang === 'en' ? 'Please select an image file.' : '請選擇圖片檔案',
+        'error'
+      );
       return;
     }
     if(f.size > LOGO_MAX_FILE_BYTES){
       const mb = (f.size / 1024 / 1024).toFixed(2);
-      alert(state.lang === 'en'
-        ? 'File too large (' + mb + ' MB). Max 2 MB allowed.'
-        : '檔案過大（' + mb + ' MB），最大限制 2 MB');
+      popup(
+        state.lang === 'en' ? 'File Too Large' : '檔案過大',
+        state.lang === 'en' 
+          ? 'File too large (' + mb + ' MB). Max 2 MB allowed.'
+          : '檔案大小 ' + mb + ' MB，超過 2 MB 限制',
+        'error'
+      );
       e.target.value = '';
       return;
     }
@@ -4207,7 +4367,14 @@
 
   function saveCurrentClient(){
     const c = getClientFromForm();
-    if(!c.name){ alert(state.lang==='en'?'Client name is required':'請先填寫客戶名稱'); return; }
+    if(!c.name){
+      popup(
+        state.lang === 'en' ? 'Required Field' : '欄位必填',
+        state.lang === 'en' ? 'Client name is required.' : '請先填寫客戶名稱',
+        'error'
+      );
+      return;
+    }
     const arr = loadClients();
     const i = arr.findIndex(x => x.name === c.name);
     c.id = (i >= 0 && arr[i].id) ? arr[i].id : uid();
@@ -4370,7 +4537,14 @@
         email: $('ed-email').value.trim(),
         taxId: $('ed-tax').value.trim()
       };
-      if(!c.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      if(!c.name){
+        popup(
+          state.lang === 'en' ? 'Required Field' : '欄位必填',
+          state.lang === 'en' ? 'Name is required.' : '名稱不能空白',
+          'error'
+        );
+        return;
+      }
       const arr = loadClients();
       const i = arr.findIndex(x => x.id === c.id);
       if(i >= 0) arr[i] = c; else arr.push(c);
@@ -4383,7 +4557,14 @@
         name: $('ed-name').value.trim(),
         price: parseFloat($('ed-price').value) || 0
       };
-      if(!p.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      if(!p.name){
+        popup(
+          state.lang === 'en' ? 'Required Field' : '欄位必填',
+          state.lang === 'en' ? 'Name is required.' : '名稱不能空白',
+          'error'
+        );
+        return;
+      }
       const arr = loadProducts();
       const i = arr.findIndex(x => x.id === p.id);
       if(i >= 0) arr[i] = p; else arr.push(p);
@@ -4400,7 +4581,11 @@
   }
   function importData(file){
     if(file.size > 10 * 1024 * 1024){
-      alert(state.lang === 'en' ? 'File too large' : '檔案過大');
+      popup(
+        state.lang === 'en' ? 'File Too Large' : '檔案過大',
+        state.lang === 'en' ? 'File is too large to import.' : '檔案過大，無法匯入',
+        'error'
+      );
       return;
     }
     const r = new FileReader();
@@ -4423,10 +4608,18 @@
         renderHistory(); renderClientsList(); renderProductsList();
         toast(t('import_success'));
       } catch(err){
-        alert(t('import_fail'));
+        popup(
+          state.lang === 'en' ? 'Import Failed' : '匯入失敗',
+          state.lang === 'en' ? 'The file is not valid.' : '檔案格式不正確',
+          'error'
+        );
       }
     };
-    r.onerror = () => alert(t('import_fail'));
+    r.onerror = () => popup(
+      state.lang === 'en' ? 'Import Failed' : '匯入失敗',
+      state.lang === 'en' ? 'Failed to read the file.' : '讀取檔案失敗',
+      'error'
+    );
     r.readAsText(file);
   }
 
@@ -4687,9 +4880,11 @@
     const qnEl = $('quote-no');
     if(!qnEl.value.trim()){
       if(!currentOrg || !currentOrg.org_code){
-        alert(state.lang === 'en'
-          ? 'Organization not loaded yet. Please wait and retry.'
-          : '組織資料尚未載入，請稍候再試');
+        popup(
+          state.lang === 'en' ? 'Not Ready' : '尚未就緒',
+          state.lang === 'en' ? 'Organization not loaded yet. Please wait and retry.' : '組織資料尚未載入，請稍候再試',
+          'error'
+        );
         return;
       }
       const seq = await computeNextDailySeq();
@@ -4819,16 +5014,38 @@
       return;
     }
     if(!isValidEmail(to)){
-      alert(state.lang === 'en' ? 'Invalid recipient email' : '收件人 Email 格式不正確');
+      popup(
+        state.lang === 'en' ? 'Invalid Email' : 'Email 格式錯誤',
+        state.lang === 'en' ? 'Recipient email format is invalid.' : '收件人 Email 格式不正確',
+        'error'
+      );
       $('mail-to').focus();
       return;
     }
     const cc = $('mail-cc').value.trim();
     const bcc = $('mail-bcc').value.trim();
-    if(cc && !isValidEmail(cc)){ alert(state.lang === 'en' ? 'Invalid CC email' : 'CC Email 格式不正確'); return; }
-    if(bcc && !isValidEmail(bcc)){ alert(state.lang === 'en' ? 'Invalid BCC email' : 'BCC Email 格式不正確'); return; }
+    if(cc && !isValidEmail(cc)){
+      popup(
+        state.lang === 'en' ? 'Invalid Email' : 'Email 格式錯誤',
+        state.lang === 'en' ? 'CC email format is invalid.' : 'CC Email 格式不正確',
+        'error'
+      );
+      return;
+    }
+    if(bcc && !isValidEmail(bcc)){
+      popup(
+        state.lang === 'en' ? 'Invalid Email' : 'Email 格式錯誤',
+        state.lang === 'en' ? 'BCC email format is invalid.' : 'BCC Email 格式不正確',
+        'error'
+      );
+      return;
+    }
     if(!$('mail-subject').value.trim()){
-      alert(state.lang === 'en' ? 'Subject is required' : '主旨不能為空');
+      popup(
+        state.lang === 'en' ? 'Required Field' : '欄位必填',
+        state.lang === 'en' ? 'Subject is required.' : '主旨不能為空',
+        'error'
+      );
       return;
     }
     renderConfirmSummary();
@@ -4937,7 +5154,11 @@
       console.error('Send error:', err);
       sendBtn.disabled = false;
       sendBtn.innerHTML = original;
-      alert((state.lang === 'en' ? 'Error: ' : '錯誤：') + (err.message || err));
+      popup(
+        state.lang === 'en' ? 'Error' : '錯誤',
+        err.message || String(err),
+        'error'
+      );
     }
   });
 
@@ -5144,9 +5365,14 @@
     // Force change password if flagged (account was created by admin with default password)
     if(currentMember.must_change_password){
       setTimeout(() => {
-        alert(state.lang === 'en'
-          ? 'Your account was created by an admin. For security, please change your password now.'
-          : '您的帳號由管理員建立，請立即修改密碼以保護您的帳戶。');
+        popup(
+          state.lang === 'en' ? 'Please Change Password' : '請修改密碼',
+          state.lang === 'en' 
+            ? 'Your account was created by an admin. For security, please change your password now.' 
+            : '您的帳號由管理員建立，請立即修改密碼以保護您的帳戶。',
+          'info',
+          { autoClose: 0 }  // require user to acknowledge
+        );
         if(typeof openAccountModal === 'function') openAccountModal();
       }, 600);
     }
@@ -5252,7 +5478,11 @@
   async function saveOrgSettings(){
     if(!currentOrg) return;
     if(currentMember.role !== 'admin'){
-      alert(state.lang === 'en' ? 'Only admin can edit org info' : '僅管理員可修改基本資料');
+      popup(
+        state.lang === 'en' ? 'Permission Denied' : '無權限',
+        state.lang === 'en' ? 'Only admin can edit company info.' : '僅管理員可修改公司資料',
+        'error'
+      );
       return;
     }
     const btn = $('btn-save-org');
@@ -5337,7 +5567,15 @@
         const mid = e.currentTarget.dataset.approve;
         e.currentTarget.disabled = true;
         const { error } = await supa.rpc('approve_member', { p_member_id: mid });
-        if(error){ alert(error.message); e.currentTarget.disabled = false; return; }
+        if(error){
+          popup(
+            state.lang === 'en' ? 'Approve Failed' : '審核失敗',
+            error.message || String(error),
+            'error'
+          );
+          e.currentTarget.disabled = false;
+          return;
+        }
         await renderMembers();
         await refreshPendingCount();
       }));
@@ -5371,7 +5609,11 @@
         toast(state.lang === 'en' ? 'Member removed' : '已移除成員', 'success');
         await renderMembers();
       } catch(err){
-        alert((state.lang === 'en' ? 'Failed: ' : '失敗：') + err.message);
+        popup(
+          state.lang === 'en' ? 'Failed' : '失敗',
+          err.message || String(err),
+          'error'
+        );
         e.currentTarget.disabled = false;
       }
     }));
@@ -6243,7 +6485,7 @@
   // save-client — direct binding
   $('save-client').addEventListener('click', async () => {
     const c = getClientFromForm();
-    if(!c.name){ alert(state.lang==='en'?'Client name is required':'請先填寫客戶名稱'); return; }
+    if(!c.name){ popup(state.lang==='en'?'Required Field':'欄位必填', state.lang==='en'?'Client name is required.':'請先填寫客戶名稱', 'error'); return; }
     const arr = loadClients();
     // De-dup priority: tax_id (if any) > name (case-insensitive trimmed)
     const taxId = (c.taxId || '').trim();
@@ -6279,7 +6521,7 @@
         email: $('ed-email').value.trim(),
         taxId: $('ed-tax').value.trim()
       };
-      if(!c.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      if(!c.name){ popup(state.lang==='en'?'Required Field':'欄位必填', state.lang==='en'?'Name is required.':'名稱不能空白', 'error'); return; }
       const arr = loadClients();
       const i = arr.findIndex(x => x.id === c.id);
       if(i >= 0) arr[i] = c; else arr.push(c);
@@ -6292,7 +6534,7 @@
         name: $('ed-name').value.trim(),
         price: parseFloat($('ed-price').value) || 0
       };
-      if(!p.name){ alert(state.lang==='en'?'Name required':'名稱不能空白'); return; }
+      if(!p.name){ popup(state.lang==='en'?'Required Field':'欄位必填', state.lang==='en'?'Name is required.':'名稱不能空白', 'error'); return; }
       const arr = loadProducts();
       const i = arr.findIndex(x => x.id === p.id);
       if(i >= 0) arr[i] = p; else arr.push(p);
