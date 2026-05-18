@@ -1446,7 +1446,10 @@
         <div class="grid-4">
           <div class="field">
             <label data-i18n="quote_no">報價單編號</label>
-            <input type="text" id="quote-no" readonly data-i18n-ph="quote_no_hint" placeholder="儲存後自動產生" style="background:var(--surface-2); cursor:not-allowed; color:var(--text-2)" />
+            <div style="display:flex; align-items:center; gap:8px">
+              <input type="text" id="quote-no" readonly data-i18n-ph="quote_no_hint" placeholder="儲存後自動產生" style="background:var(--surface-2); cursor:not-allowed; color:var(--text-2); flex:1" />
+              <span id="editor-status-badge" style="display:none; flex-shrink:0"></span>
+            </div>
           </div>
           <div class="field">
             <label data-i18n="quote_date">日期</label>
@@ -3010,6 +3013,8 @@
       $('from-contact').value = currentMember.display_name || '';
     }
     renderItems();
+    // Update status badge (hidden since no quoteNo yet)
+    if(typeof updateEditorStatusBadge === 'function') updateEditorStatusBadge();
     // Switch to editor tab
     if(typeof switchTab === 'function'){ switchTab('editor'); }
     // Visual feedback
@@ -3059,6 +3064,31 @@
   // Used to detect if client info was modified before re-save
   let loadedClientSnapshot = null;
 
+  // Show a quote in read-only popup (for viewing other members' quotes)
+  function showQuoteReadOnly(q){
+    const c = currencies[q.currency] || currencies.TWD;
+    const totalStr = c.symbol + ' ' + (Math.round((q.total||0)*100)/100).toLocaleString();
+    const isEn = state.lang === 'en';
+    const creatorName = q.createdBy ? (orgMembersMap[q.createdBy] || (isEn ? 'Unknown' : '未知')) : (isEn ? 'Unknown' : '未知');
+    const itemsHtml = (q.items || []).map(it => 
+      '<tr><td>'+escapeHtml(it.name || '')+'</td><td style="text-align:right">'+(it.qty || 0)+'</td><td style="text-align:right">'+(c.symbol)+' '+((it.price||0).toLocaleString())+'</td></tr>'
+    ).join('');
+    const msg = 
+      (isEn ? 'No.: ' : '報價單號：') + (q.quoteNo || '—') + '\n' +
+      (isEn ? 'Date: ' : '日期：') + (q.quoteDate || '—') + '\n' +
+      (isEn ? 'Valid Until: ' : '有效期至：') + (q.validUntil || '—') + '\n' +
+      (isEn ? 'Client: ' : '客戶：') + ((q.to && q.to.name) || '—') + '\n' +
+      (isEn ? 'Status: ' : '狀態：') + statusLabel(effectiveStatus(q)) + '\n' +
+      (isEn ? 'Created by: ' : '建立者：') + creatorName + '\n' +
+      (isEn ? 'Total: ' : '總金額：') + totalStr;
+    popup(
+      (isEn ? 'View Quote' : '檢視報價單'),
+      msg,
+      'info',
+      { autoClose: 0 }  // disable auto-close for viewing
+    );
+  }
+
   function loadSnapshot(q){
     // Restore UUID so re-saving updates the same row
     currentQuoteUuid = q.id || uid();
@@ -3097,6 +3127,8 @@
       email: t2.email || '',
       taxId: t2.taxId || ''
     };
+    // Update status badge to reflect loaded quote's status
+    if(typeof updateEditorStatusBadge === 'function') updateEditorStatusBadge();
   }
 
   // Compare current client form to the loaded snapshot
@@ -3240,6 +3272,23 @@
     return q.status || 'draft';
   }
 
+  // Update the status badge shown next to the quote number in the editor
+  // Reflects the currently loaded quote's status (or hides if new draft)
+  function updateEditorStatusBadge(){
+    const badge = $('editor-status-badge');
+    if(!badge) return;
+    const quoteNo = $('quote-no').value;
+    const status = window._currentQuoteStatus || 'draft';
+    // Only show if the quote has been saved (has a quoteNo)
+    // For new unsaved quotes, hide the badge
+    if(!quoteNo){
+      badge.style.display = 'none';
+      return;
+    }
+    badge.innerHTML = statusBadge(status);
+    badge.style.display = '';
+  }
+
   // Refresh "draft count" badge on the History tab button
   // Counts only quotes that are still in 'draft' state (not sent yet)
   function refreshDraftBadge(){
@@ -3247,7 +3296,6 @@
     if(!badge) return;
     const all = loadQuotes();
     const drafts = all.filter(q => effectiveStatus(q) === 'draft');
-    console.log('[refreshDraftBadge] total quotes:', all.length, 'drafts:', drafts.length, 'all statuses:', all.map(q => ({no: q.quoteNo, status: q.status, eff: effectiveStatus(q)})));
     if(drafts.length > 0){
       badge.textContent = drafts.length;
       badge.style.display = '';
@@ -3264,6 +3312,13 @@
   // - accepted / rejected: full set so user can correct mistakes
   function buildQuoteActionRow(q){
     const eff = effectiveStatus(q);
+    const myId = currentUser && currentUser.id;
+    const isAdmin = currentMember && currentMember.role === 'admin';
+    const isMine = !q.createdBy || q.createdBy === myId;  // legacy quotes (no createdBy) = mine
+    const canEditStatus = isMine && eff !== 'draft';  // status change: only my own non-draft
+    const canLoad = isMine;                            // load to editor: only my own quotes
+    const canDelete = isMine || isAdmin;               // delete: my own OR admin (any)
+
     let options;
     if(eff === 'draft'){
       // Draft → only show 'draft' (locked). To send, user clicks Load → Send.
@@ -3276,17 +3331,40 @@
         '<option value="accepted"'+(currentVal==='accepted'?' selected':'')+'>'+statusLabel('accepted')+'</option>'+
         '<option value="rejected"'+(currentVal==='rejected'?' selected':'')+'>'+statusLabel('rejected')+'</option>';
     }
-    const isDraft = eff === 'draft';
-    const selectStyle = isDraft 
+
+    // Status select: disabled if draft OR not mine
+    const statusDisabled = !canEditStatus;
+    let statusTooltip = '';
+    if(eff === 'draft'){
+      statusTooltip = state.lang === 'en' ? 'Drafts cannot change status directly' : '草稿無法直接改狀態，請載入後寄送';
+    } else if(!isMine){
+      statusTooltip = state.lang === 'en' ? 'Only the creator can change status' : '僅建立者可變更狀態';
+    }
+    const statusStyle = statusDisabled 
       ? 'padding:6px 10px; font-size:12px; opacity:0.5; cursor:not-allowed; background:var(--surface-2)'
       : 'padding:6px 10px; font-size:12px';
-    const selectDisabled = isDraft ? ' disabled title="草稿無法直接改狀態，請載入後寄送"' : '';
+    const statusAttrs = statusDisabled ? ' disabled title="'+escapeHtml(statusTooltip)+'"' : '';
+
+    // Load button: hidden if not mine
+    const loadBtn = canLoad
+      ? '<button class="btn" data-load="'+escapeHtml(q.id)+'">'+t('load')+'</button>'
+      : '<button class="btn" data-view="'+escapeHtml(q.id)+'" title="'+escapeHtml(state.lang === 'en' ? 'View only' : '僅檢視')+'" style="opacity:0.7">'+
+          (state.lang === 'en' ? 'View' : '檢視')+
+        '</button>';
+
+    // Delete button: hidden if not mine and not admin
+    const delBtn = canDelete
+      ? '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)"'+
+          (isAdmin && !isMine ? ' title="'+escapeHtml(state.lang === 'en' ? 'Admin delete' : '管理員刪除')+'"' : '')+
+        '>'+t('delete')+'</button>'
+      : '';  // No delete button for non-owners (regular members)
+
     return '<div class="history-actions">'+
-      '<select class="btn" data-status-set="'+escapeHtml(q.id)+'"'+selectDisabled+' style="'+selectStyle+'">'+
+      '<select class="btn" data-status-set="'+escapeHtml(q.id)+'"'+statusAttrs+' style="'+statusStyle+'">'+
         options+
       '</select>'+
-      '<button class="btn" data-load="'+escapeHtml(q.id)+'">'+t('load')+'</button>'+
-      '<button class="btn" data-del="'+escapeHtml(q.id)+'" style="color:var(--danger)">'+t('delete')+'</button>'+
+      loadBtn+
+      delBtn+
     '</div>';
   }
 
@@ -3413,18 +3491,44 @@
     list.innerHTML = html;
 
     // Bind events on the freshly rendered items
+    // Load: full edit access (own quotes only)
     list.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', e => {
       const id = e.currentTarget.dataset.load;
       const q = loadQuotes().find(x => x.id === id);
-      if(q){
-        loadSnapshot(q);
-        switchTab('editor');
-        toast(state.lang === 'en' ? 'Loaded quote ' + (q.quoteNo || '') : '已載入報價單 ' + (q.quoteNo || ''), 'success');
+      if(!q) return;
+      // Safety check: don't load someone else's quote
+      const myId = currentUser && currentUser.id;
+      if(q.createdBy && q.createdBy !== myId){
+        popup(
+          state.lang === 'en' ? 'Cannot Edit' : '無法編輯',
+          state.lang === 'en' ? 'This quote was created by another member. You can view it but not edit.' : '此報價單由其他成員建立，您只能檢視無法編輯。',
+          'error'
+        );
+        return;
       }
+      loadSnapshot(q);
+      switchTab('editor');
+      toast(state.lang === 'en' ? 'Loaded quote ' + (q.quoteNo || '') : '已載入報價單 ' + (q.quoteNo || ''), 'success');
+    }));
+    // View: read-only popup (someone else's quotes)
+    list.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', e => {
+      const id = e.currentTarget.dataset.view;
+      const q = loadQuotes().find(x => x.id === id);
+      if(!q) return;
+      showQuoteReadOnly(q);
     }));
     list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', e => {
-      if(!confirm(t('confirm_delete'))) return;
       const id = e.currentTarget.dataset.del;
+      const q = loadQuotes().find(x => x.id === id);
+      const myId = currentUser && currentUser.id;
+      const isAdmin = currentMember && currentMember.role === 'admin';
+      const isMine = !q || !q.createdBy || q.createdBy === myId;
+      const confirmMsg = (!isMine && isAdmin)
+        ? (state.lang === 'en' 
+            ? 'You are deleting another member\'s quote as admin. Continue?' 
+            : '您將以管理員身分刪除其他成員的報價單，確定繼續？')
+        : t('confirm_delete');
+      if(!confirm(confirmMsg)) return;
       saveQuotes(loadQuotes().filter(x => x.id !== id));
       if(currentMember){
         supa.from('quotes').delete().eq('id', id).then(({error}) => {
@@ -3441,6 +3545,17 @@
       const all = loadQuotes();
       const i = all.findIndex(x => x.id === id);
       if(i < 0) return;
+      // Safety: don't allow others to change my status (should be blocked by UI but double-check)
+      const myId = currentUser && currentUser.id;
+      if(all[i].createdBy && all[i].createdBy !== myId){
+        popup(
+          state.lang === 'en' ? 'Permission Denied' : '無權限',
+          state.lang === 'en' ? 'Only the creator can change status.' : '僅建立者可變更狀態',
+          'error'
+        );
+        renderHistory();  // restore UI
+        return;
+      }
       all[i].status = newStatus;
       all[i].statusUpdatedAt = new Date().toISOString();
       saveQuotes(all);
@@ -4789,6 +4904,9 @@
       autoBackup('after-send');
       // Refresh draft badge (quote just moved from draft → sent)
       refreshDraftBadge();
+      // Update editor status badge (now showing 'sent')
+      window._currentQuoteStatus = 'sent';
+      if(typeof updateEditorStatusBadge === 'function') updateEditorStatusBadge();
 
       // STEP 6: Open user's local mail client
       window.location.href = mailtoUrl;
@@ -5737,7 +5855,6 @@
   const settingsBtnSaveProfile = $('settings-btn-save-profile');
   if(settingsBtnSaveProfile){
     settingsBtnSaveProfile.addEventListener('click', async () => {
-      console.log('[Save Profile] clicked');
       const name = $('settings-acct-display-name').value.trim();
       if(!name){
         console.warn('[Save Profile] no name');
@@ -5748,12 +5865,9 @@
       const mobile = $('settings-acct-mobile').value.trim();
       const lineId = $('settings-acct-line-id').value.trim();
       const sig = $('settings-acct-signature').value;
-      console.log('[Save Profile] name=', name, 'title=', title, 'mobile=', mobile, 'lineId=', lineId);
-      console.log('[Save Profile] currentUser:', currentUser && currentUser.id);
       const btn = $('settings-btn-save-profile');
       btn.disabled = true;
       try {
-        console.log('[Save Profile] calling supabase update...');
         const { data, error } = await supa.from('members')
           .update({ 
             display_name: name, 
@@ -5764,7 +5878,6 @@
           })
           .eq('id', currentUser.id)
           .select();
-        console.log('[Save Profile] update result data=', data, 'error=', error);
         if(error) throw error;
         if(!data || data.length === 0){
           throw new Error('No row updated. Check RLS policy on members table.');
@@ -5781,7 +5894,6 @@
           const tpl = buildDefaultPersonalSignature();
           sigEl.placeholder = tpl || (state.lang === 'en' ? 'Enter your personal signature here' : '在此輸入個人簽名');
         }
-        console.log('[Save Profile] success');
         popup(
           state.lang === 'en' ? 'Saved' : '儲存成功',
           state.lang === 'en' ? 'Profile updated successfully.' : '個人資料已更新',
@@ -5826,18 +5938,14 @@
       }
       settingsBtnChangePw.disabled = true;
       try {
-        console.log('[Change PW] calling supa.auth.updateUser...');
         const { error } = await supa.auth.updateUser({ password: pw });
         if(error) throw error;
-        console.log('[Change PW] auth update OK');
         // Now clear must_change_password flag if it was set
         if(currentMember && currentMember.must_change_password){
-          console.log('[Change PW] clearing must_change_password flag...');
           const { data: updData, error: updErr } = await supa.from('members')
             .update({ must_change_password: false })
             .eq('id', currentUser.id)
             .select();
-          console.log('[Change PW] flag clear result:', updData, 'error:', updErr);
           if(updErr){
             console.warn('Failed to clear must_change_password:', updErr);
             // Tell user the password changed but flag wasn't cleared
@@ -6077,6 +6185,8 @@
       autoBackup('after-save');
       // Refresh the draft count badge (top right of "History" tab)
       refreshDraftBadge();
+      // Refresh the status badge in the editor (now that we have a quoteNo)
+      if(typeof updateEditorStatusBadge === 'function') updateEditorStatusBadge();
       // Refresh the loaded client snapshot to reflect what we just saved
       // (so future re-saves don't keep asking about the same modification)
       loadedClientSnapshot = {
