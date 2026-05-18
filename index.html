@@ -3195,7 +3195,12 @@
     type = type || 'success';
     options = options || {};
     const backdrop = $('popup-backdrop');
-    if(!backdrop) return;
+    if(!backdrop){
+      console.warn('[popup] backdrop element not found in DOM');
+      // Fallback to alert so user sees something
+      alert((title ? title + '\n\n' : '') + (msg || ''));
+      return;
+    }
 
     $('popup-title').textContent = title || '';
     $('popup-msg').textContent = msg || '';
@@ -3203,14 +3208,44 @@
     // Update icon
     const iconWrap = $('popup-icon-wrap');
     iconWrap.className = 'popup-icon-wrap' + (type !== 'success' ? ' ' + type : '');
+    // Inline-style fallback for icon colors (in case CSS not loaded)
+    const iconBg = type === 'error' ? '#fee2e2' : type === 'info' ? '#dbeafe' : '#dcfce7';
+    const iconColor = type === 'error' ? '#b91c1c' : type === 'info' ? '#1e40af' : '#15803d';
+    iconWrap.style.cssText = 'width:72px; height:72px; margin:0 auto 16px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:'+iconBg+'; color:'+iconColor+';';
+
     const iconSvg = $('popup-icon');
     iconSvg.innerHTML = POPUP_ICONS[type] || POPUP_ICONS.success;
 
-    // Update button style
+    // Update button style (also inline as fallback)
     const btn = $('popup-btn');
     btn.className = 'popup-btn' + (type === 'error' ? ' error' : '');
+    const btnBg = type === 'error' ? '#b91c1c' : '#0c6e51';
+    btn.style.cssText = 'background:'+btnBg+'; color:white; border:0; border-radius:8px; padding:11px 32px; font-size:15px; font-weight:500; cursor:pointer; font-family:inherit; min-width:120px;';
 
-    backdrop.style.display = 'flex';
+    // FORCE backdrop display via inline style (bypass any CSS issues)
+    backdrop.style.cssText = 
+      'position:fixed;'+
+      'inset:0;'+
+      'top:0; right:0; bottom:0; left:0;'+
+      'background:rgba(0,0,0,0.5);'+
+      'z-index:999998;'+
+      'display:flex;'+
+      'align-items:center;'+
+      'justify-content:center;'+
+      'padding:16px;';
+
+    // Force popup card style too
+    const card = backdrop.querySelector('.popup');
+    if(card){
+      card.style.cssText = 
+        'background:white;'+
+        'border-radius:16px;'+
+        'padding:32px 32px 24px;'+
+        'width:100%;'+
+        'max-width:360px;'+
+        'box-shadow:0 20px 50px rgba(0,0,0,0.2);'+
+        'text-align:center;';
+    }
 
     // Close handler (single source — runs once)
     const close = () => {
@@ -3296,6 +3331,8 @@
     if(!badge) return;
     const all = loadQuotes();
     const drafts = all.filter(q => effectiveStatus(q) === 'draft');
+    console.log('[refreshDraftBadge] total=', all.length, 'drafts=', drafts.length, 
+      'detail=', all.map(q => ({no: q.quoteNo, status: q.status, eff: effectiveStatus(q), createdBy: q.createdBy})));
     if(drafts.length > 0){
       badge.textContent = drafts.length;
       badge.style.display = '';
@@ -3580,7 +3617,7 @@
       const el = $('tab-'+n);
       if(el) el.style.display = name === n ? '' : 'none';
     });
-    if(name === 'history') renderHistory();
+    if(name === 'history') { renderHistory(); refreshDraftBadge(); }
     if(name === 'clients') renderClientsList();
     if(name === 'products') renderProductsList();
     if(name === 'settings') renderSettingsPage();
