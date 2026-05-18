@@ -3938,16 +3938,12 @@
     });
 
     const headerName = ($('from-name').value || '').trim() || (state.lang === 'en' ? 'Quotation' : '報價單');
-    // Subtitle: prefer tax ID if available (most commonly needed for B2B quotes)
-    const fromTaxId = ($('from-tax').value || '').trim();
-    const subtitle = fromTaxId ? (state.lang === 'en' ? 'Tax ID: ' : '統一編號：') + fromTaxId : '';
     n.innerHTML =
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; border-bottom:2px solid #1a1a1a; padding-bottom:20px">'+
         '<div style="display:flex; align-items:center; gap:16px">'+
           (logo ? '<img src="'+logo+'" crossorigin="anonymous" style="width:64px; height:64px; object-fit:contain" />' : '')+
           '<div>'+
             '<div style="font-size:26px; font-weight:600; letter-spacing:1px">'+escapeHtml(headerName)+'</div>'+
-            (subtitle ? '<div style="font-size:12px; color:#666; margin-top:2px">'+escapeHtml(subtitle)+'</div>' : '')+
           '</div>'+
         '</div>'+
         '<div style="text-align:right">'+
