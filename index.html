@@ -6114,17 +6114,21 @@
 
   // Save button — single source of truth, no cloning
   $('btn-save').addEventListener('click', async () => {
+    console.log('[Save Quote] button clicked');
     const btn = $('btn-save');
-    if(btn.disabled) return;
+    if(btn.disabled){ console.log('[Save Quote] button disabled, abort'); return; }
     btn.disabled = true;
     try {
       // If quote number is empty (new quote, never saved), compute it now
       const qnEl = $('quote-no');
       if(!qnEl.value.trim()){
         if(!currentOrg || !currentOrg.org_code){
-          alert(state.lang === 'en'
-            ? 'Organization not loaded yet. Please wait a moment and retry.'
-            : '組織資料尚未載入，請稍候再試');
+          popup(
+            state.lang === 'en' ? 'Not Ready' : '尚未就緒',
+            state.lang === 'en' ? 'Organization not loaded yet. Please wait a moment and retry.' : '組織資料尚未載入，請稍候再試',
+            'error'
+          );
+          btn.disabled = false;  // <-- BUG FIX: re-enable button before early return
           return;
         }
         const seq = await computeNextDailySeq();
@@ -6132,6 +6136,7 @@
         qnEl.value = realNo;
         window._pendingDailySeq = seq;
       }
+      console.log('[Save Quote] quoteNo:', qnEl.value);
 
       const s = snapshot();
       if(window._pendingDailySeq){
@@ -6203,9 +6208,11 @@
       const msg = state.lang === 'en'
         ? (isUpdate ? 'Quote updated successfully.' : 'Saved as ' + qnEl.value)
         : (isUpdate ? '報價單已更新' : '報價單編號：' + qnEl.value);
+      console.log('[Save Quote] calling popup, title=', title);
       popup(title, msg, 'success');
+      console.log('[Save Quote] popup returned');
     } catch(err){
-      console.error('Save error:', err);
+      console.error('[Save Quote] error:', err);
       popup(
         state.lang === 'en' ? 'Save Failed' : '儲存失敗',
         err.message || String(err),
