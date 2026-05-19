@@ -4575,13 +4575,15 @@
       if(c) openClientEditor(c);
     }));
     list.querySelectorAll('[data-del-c]').forEach(b => b.addEventListener('click', async e => {
+      // Capture id BEFORE await
+      const id = e.currentTarget.dataset.delC;
       const ok = await confirmDialog(
         state.lang === 'en' ? 'Delete Client?' : '確定刪除？',
         state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
         { type: 'danger' }
       );
       if(!ok) return;
-      saveClients(loadClients().filter(x => x.id !== e.currentTarget.dataset.delC));
+      saveClients(loadClients().filter(x => x.id !== id));
       renderClientsList();
     }));
   }
@@ -4611,13 +4613,15 @@
       if(p) openProductEditor(p);
     }));
     list.querySelectorAll('[data-del-p]').forEach(b => b.addEventListener('click', async e => {
+      // Capture id BEFORE await
+      const id = e.currentTarget.dataset.delP;
       const ok = await confirmDialog(
         state.lang === 'en' ? 'Delete Item?' : '確定刪除？',
         state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
         { type: 'danger' }
       );
       if(!ok) return;
-      saveProducts(loadProducts().filter(x => x.id !== e.currentTarget.dataset.delP));
+      saveProducts(loadProducts().filter(x => x.id !== id));
       renderProductsList();
     }));
   }
@@ -5810,8 +5814,9 @@
         '</div>'
       ).join('');
       pl.querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', async e => {
-        const mid = e.currentTarget.dataset.approve;
-        e.currentTarget.disabled = true;
+        const btn = e.currentTarget;
+        const mid = btn.dataset.approve;
+        btn.disabled = true;
         const { error } = await supa.rpc('approve_member', { p_member_id: mid });
         if(error){
           popup(
@@ -5819,7 +5824,7 @@
             error.message || String(error),
             'error'
           );
-          e.currentTarget.disabled = false;
+          btn.disabled = false;
           return;
         }
         await renderMembers();
@@ -5841,7 +5846,8 @@
     }).join('') || '<div class="empty">—</div>';
 
     al.querySelectorAll('[data-remove-m]').forEach(b => b.addEventListener('click', async e => {
-      const mid = e.currentTarget.dataset.removeM;
+      const btn = e.currentTarget;
+      const mid = btn.dataset.removeM;
       const target = active.find(x => x.id === mid);
       if(!target) return;
       const ok = await confirmDialog(
@@ -5852,7 +5858,7 @@
         { type: 'danger' }
       );
       if(!ok) return;
-      e.currentTarget.disabled = true;
+      btn.disabled = true;
       try {
         const { error } = await supa.from('members').delete().eq('id', mid);
         if(error) throw error;
@@ -5864,7 +5870,7 @@
           err.message || String(err),
           'error'
         );
-        e.currentTarget.disabled = false;
+        btn.disabled = false;
       }
     }));
   }
@@ -6842,13 +6848,14 @@
       const fresh = b.cloneNode(true);
       b.replaceWith(fresh);
       fresh.addEventListener('click', async e => {
+        // Capture id BEFORE await — e.currentTarget becomes null after the async gap
+        const id = e.currentTarget.dataset.delC;
         const ok = await confirmDialog(
           state.lang === 'en' ? 'Delete Client?' : '確定刪除？',
           state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
           { type: 'danger' }
         );
         if(!ok) return;
-        const id = e.currentTarget.dataset.delC;
         saveClients(loadClients().filter(x => x.id !== id));
         await deleteClientFromCloud(id);
         renderClientsList();
@@ -6862,13 +6869,14 @@
       const fresh = b.cloneNode(true);
       b.replaceWith(fresh);
       fresh.addEventListener('click', async e => {
+        // Capture id BEFORE await
+        const id = e.currentTarget.dataset.delP;
         const ok = await confirmDialog(
           state.lang === 'en' ? 'Delete Item?' : '確定刪除？',
           state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
           { type: 'danger' }
         );
         if(!ok) return;
-        const id = e.currentTarget.dataset.delP;
         saveProducts(loadProducts().filter(x => x.id !== id));
         await deleteProductFromCloud(id);
         renderProductsList();
