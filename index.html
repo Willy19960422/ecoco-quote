@@ -5712,7 +5712,7 @@
     }
 
     // Other org fields: also lock down for non-admins
-    const orgFields = ['org-name','org-address','org-phone','org-email'];
+    const orgFields = ['org-name','org-address','org-address-en','org-phone','org-email','org-website'];
     orgFields.forEach(id => {
       const el = $(id);
       if(el){
