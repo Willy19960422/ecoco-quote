@@ -2980,9 +2980,17 @@
   async function newQuote(){
     // Safety: if editor has unsaved data, ask user
     if(editorHasContent() && !editorMatchesSaved()){
-      const choice = confirm(state.lang === 'en'
-        ? 'The current quote has unsaved changes. Save it before creating a new one?\n\nClick OK to save first, Cancel to discard.'
-        : '目前報價單有未儲存的資料，是否先儲存？\n\n按「確定」先儲存，按「取消」直接捨棄。');
+      const choice = await confirmDialog(
+        state.lang === 'en' ? 'Unsaved Changes' : '尚未儲存',
+        state.lang === 'en' 
+          ? 'The current quote has unsaved changes. Save it first?'
+          : '目前報價單有未儲存的資料，是否先儲存？',
+        {
+          type: 'warn',
+          confirmText: state.lang === 'en' ? 'Save First' : '先儲存',
+          cancelText: state.lang === 'en' ? 'Discard' : '捨棄'
+        }
+      );
       if(choice){
         // Trigger save
         const saveBtn = document.getElementById('btn-save');
@@ -3253,10 +3261,74 @@
 
     // Focus button for keyboard
     setTimeout(() => btn.focus(), 50);
-    console.log('[popup] shown:', title);
   }
 
-  // Status helpers
+  // --- Confirm dialog (Promise-based, replaces window.confirm) ---
+  // Returns true if user clicked confirm, false if cancel/ESC/clicked outside.
+  // type: 'danger' (red confirm btn for destructive actions) | 'warn' (yellow) | 'info' (green, default)
+  function confirmDialog(title, msg, options){
+    options = options || {};
+    const type = options.type || 'danger';
+
+    return new Promise(resolve => {
+      // Remove existing
+      const existing = document.getElementById('confirm-dynamic');
+      if(existing) existing.remove();
+
+      const iconBg = type === 'danger' ? '#fee2e2' : type === 'warn' ? '#fef3c7' : '#dbeafe';
+      const iconColor = type === 'danger' ? '#b91c1c' : type === 'warn' ? '#a16207' : '#1e40af';
+      const confirmBg = type === 'danger' ? '#b91c1c' : type === 'warn' ? '#a16207' : '#0c6e51';
+      const iconSvg = type === 'danger'
+        ? '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>'
+        : type === 'warn'
+        ? '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
+        : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>';
+
+      const confirmText = options.confirmText || (state.lang === 'en' ? 'Confirm' : '確定');
+      const cancelText = options.cancelText || (state.lang === 'en' ? 'Cancel' : '取消');
+
+      const wrap = document.createElement('div');
+      wrap.id = 'confirm-dynamic';
+      wrap.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2147483647; display:flex; align-items:center; justify-content:center; padding:16px;';
+      wrap.innerHTML =
+        '<div style="background:white; border-radius:16px; padding:32px 32px 24px; max-width:400px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.25); text-align:center; font-family:inherit;">'+
+          '<div style="width:72px; height:72px; margin:0 auto 16px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:'+iconBg+'; color:'+iconColor+';">'+
+            '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'+iconSvg+'</svg>'+
+          '</div>'+
+          '<h3 style="font-size:19px; font-weight:600; color:#1a1a1a; margin:0 0 6px;">'+escapeHtml(title || '')+'</h3>'+
+          '<p style="font-size:14px; color:#666; margin:0 0 24px; line-height:1.5; white-space:pre-wrap;">'+escapeHtml(msg || '')+'</p>'+
+          '<div style="display:flex; gap:10px; justify-content:center;">'+
+            '<button id="confirm-dynamic-cancel" style="background:#f1efe8; color:#444; border:0; border-radius:8px; padding:11px 22px; font-size:15px; font-weight:500; cursor:pointer; font-family:inherit; min-width:90px;">'+escapeHtml(cancelText)+'</button>'+
+            '<button id="confirm-dynamic-ok" style="background:'+confirmBg+'; color:white; border:0; border-radius:8px; padding:11px 22px; font-size:15px; font-weight:500; cursor:pointer; font-family:inherit; min-width:90px;">'+escapeHtml(confirmText)+'</button>'+
+          '</div>'+
+        '</div>';
+
+      document.body.appendChild(wrap);
+
+      const okBtn = document.getElementById('confirm-dynamic-ok');
+      const cancelBtn = document.getElementById('confirm-dynamic-cancel');
+      let done = false;
+      const cleanup = (result) => {
+        if(done) return;
+        done = true;
+        document.removeEventListener('keydown', keyHandler);
+        wrap.remove();
+        resolve(result);
+      };
+      const keyHandler = (e) => {
+        if(e.key === 'Escape') cleanup(false);
+        else if(e.key === 'Enter') cleanup(true);
+      };
+
+      okBtn.addEventListener('click', () => cleanup(true));
+      cancelBtn.addEventListener('click', () => cleanup(false));
+      wrap.addEventListener('click', (e) => { if(e.target === wrap) cleanup(false); });
+      document.addEventListener('keydown', keyHandler);
+
+      // Focus the confirm button by default for keyboard users
+      setTimeout(() => okBtn.focus(), 50);
+    });
+  }
   const STATUS_LABELS_ZH = {
     draft: '草稿', sent: '已寄出', accepted: '已成交', rejected: '已拒絕', expired: '已過期'
   };
@@ -3314,7 +3386,6 @@
     if(!badge) return;
     const all = loadQuotes();
     const drafts = all.filter(q => effectiveStatus(q) === 'draft');
-    console.log('[refreshDraftBadge] drafts=', drafts.length);
     if(drafts.length > 0){
       badge.textContent = drafts.length;
       // FORCE inline style — bypass any CSS issue or HTML inline style:display:none
@@ -3538,18 +3609,20 @@
       if(!q) return;
       showQuoteReadOnly(q);
     }));
-    list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', e => {
+    list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async e => {
       const id = e.currentTarget.dataset.del;
       const q = loadQuotes().find(x => x.id === id);
       const myId = currentUser && currentUser.id;
       const isAdmin = currentMember && currentMember.role === 'admin';
       const isMine = !q || !q.createdBy || q.createdBy === myId;
+      const confirmTitle = state.lang === 'en' ? 'Delete Quote?' : '確定刪除？';
       const confirmMsg = (!isMine && isAdmin)
         ? (state.lang === 'en' 
-            ? 'You are deleting another member\'s quote as admin. Continue?' 
-            : '您將以管理員身分刪除其他成員的報價單，確定繼續？')
-        : t('confirm_delete');
-      if(!confirm(confirmMsg)) return;
+            ? 'You are deleting another member\'s quote as admin. This cannot be undone.' 
+            : '您將以管理員身分刪除其他成員的報價單，刪除後無法復原。')
+        : (state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。');
+      const ok = await confirmDialog(confirmTitle, confirmMsg, { type: 'danger' });
+      if(!ok) return;
       saveQuotes(loadQuotes().filter(x => x.id !== id));
       if(currentMember){
         supa.from('quotes').delete().eq('id', id).then(({error}) => {
@@ -4217,7 +4290,12 @@
   $('org-logo-remove').addEventListener('click', async e => {
     e.stopPropagation();
     if(!currentMember || currentMember.role !== 'admin') return;
-    if(!confirm(state.lang === 'en' ? 'Remove company logo?' : '確定移除公司 Logo？')) return;
+    const ok = await confirmDialog(
+      state.lang === 'en' ? 'Remove Logo?' : '確定移除？',
+      state.lang === 'en' ? 'The company logo will be removed.' : '將移除公司 Logo',
+      { type: 'warn' }
+    );
+    if(!ok) return;
     // Optimistic UI
     clearLogo();
     clearOrgLogoUI();
@@ -4496,8 +4574,13 @@
       const c = loadClients().find(x => x.id === e.currentTarget.dataset.editC);
       if(c) openClientEditor(c);
     }));
-    list.querySelectorAll('[data-del-c]').forEach(b => b.addEventListener('click', e => {
-      if(!confirm(t('confirm_delete'))) return;
+    list.querySelectorAll('[data-del-c]').forEach(b => b.addEventListener('click', async e => {
+      const ok = await confirmDialog(
+        state.lang === 'en' ? 'Delete Client?' : '確定刪除？',
+        state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
+        { type: 'danger' }
+      );
+      if(!ok) return;
       saveClients(loadClients().filter(x => x.id !== e.currentTarget.dataset.delC));
       renderClientsList();
     }));
@@ -4527,8 +4610,13 @@
       const p = loadProducts().find(x => x.id === e.currentTarget.dataset.editP);
       if(p) openProductEditor(p);
     }));
-    list.querySelectorAll('[data-del-p]').forEach(b => b.addEventListener('click', e => {
-      if(!confirm(t('confirm_delete'))) return;
+    list.querySelectorAll('[data-del-p]').forEach(b => b.addEventListener('click', async e => {
+      const ok = await confirmDialog(
+        state.lang === 'en' ? 'Delete Item?' : '確定刪除？',
+        state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
+        { type: 'danger' }
+      );
+      if(!ok) return;
       saveProducts(loadProducts().filter(x => x.id !== e.currentTarget.dataset.delP));
       renderProductsList();
     }));
@@ -4679,7 +4767,7 @@
       return;
     }
     const r = new FileReader();
-    r.onload = e => {
+    r.onload = async e => {
       try {
         const d = JSON.parse(e.target.result);
         // Validate structure
@@ -4688,7 +4776,14 @@
                       (Array.isArray(d.clients) || d.clients === undefined) &&
                       (Array.isArray(d.products) || d.products === undefined);
         if(!valid) throw new Error('invalid schema');
-        if(!confirm(t('confirm_import'))) return;
+        const ok = await confirmDialog(
+          state.lang === 'en' ? 'Import Data?' : '確定匯入？',
+          state.lang === 'en' 
+            ? 'This will replace your current data with the file contents.'
+            : '匯入會覆蓋目前的資料',
+          { type: 'warn' }
+        );
+        if(!ok) return;
         if(Array.isArray(d.quotes)) saveQuotes(d.quotes);
         if(Array.isArray(d.clients)) saveClients(d.clients);
         if(Array.isArray(d.products)) saveProducts(d.products);
@@ -4696,7 +4791,11 @@
           saveLogo(d.logo); showLogo(d.logo);
         }
         renderHistory(); renderClientsList(); renderProductsList();
-        toast(t('import_success'));
+        popup(
+          state.lang === 'en' ? 'Imported' : '匯入完成',
+          state.lang === 'en' ? 'Data imported successfully.' : '資料已成功匯入',
+          'success'
+        );
       } catch(err){
         popup(
           state.lang === 'en' ? 'Import Failed' : '匯入失敗',
@@ -4758,7 +4857,14 @@
   // Re-sync local to cloud
   $('btn-resync').addEventListener('click', async () => {
     if(!currentMember) return;
-    if(!confirm(t('resync_confirm'))) return;
+    const ok = await confirmDialog(
+      state.lang === 'en' ? 'Re-sync to Cloud?' : '重新同步至雲端？',
+      state.lang === 'en' 
+        ? 'This will push all local data to cloud (will not clear cloud).'
+        : '將本地所有資料推送到雲端（不會清空雲端）',
+      { type: 'info' }
+    );
+    if(!ok) return;
     const btn = $('btn-resync');
     btn.disabled = true;
     const orig = btn.innerHTML;
@@ -4811,14 +4917,29 @@
       '</div>'
     ).join('');
     container.querySelectorAll('[data-restore]').forEach(btn => {
-      btn.addEventListener('click', e => {
+      btn.addEventListener('click', async e => {
         const key = e.currentTarget.dataset.restore;
-        if(!confirm(t('confirm_import'))) return;
+        const ok = await confirmDialog(
+          state.lang === 'en' ? 'Restore Backup?' : '還原備份？',
+          state.lang === 'en' 
+            ? 'This will replace your current data with the backup.'
+            : '會以此備份覆蓋目前的資料',
+          { type: 'warn' }
+        );
+        if(!ok) return;
         if(restoreBackup(key)){
-          toast(t('import_success'), 'success');
+          popup(
+            state.lang === 'en' ? 'Restored' : '已還原',
+            state.lang === 'en' ? 'Backup restored successfully.' : '備份已成功還原',
+            'success'
+          );
           renderHistory(); renderClientsList(); renderProductsList();
         } else {
-          toast(t('import_fail'), 'error');
+          popup(
+            state.lang === 'en' ? 'Restore Failed' : '還原失敗',
+            state.lang === 'en' ? 'The backup data could not be loaded.' : '無法載入此備份',
+            'error'
+          );
         }
       });
     });
@@ -5723,10 +5844,14 @@
       const mid = e.currentTarget.dataset.removeM;
       const target = active.find(x => x.id === mid);
       if(!target) return;
-      const confirmMsg = (state.lang === 'en'
-        ? 'Remove ' + (target.display_name || target.email) + ' from this organization?'
-        : '確定將 ' + (target.display_name || target.email) + ' 從本組織移除？');
-      if(!confirm(confirmMsg)) return;
+      const ok = await confirmDialog(
+        state.lang === 'en' ? 'Remove Member?' : '確定移除？',
+        state.lang === 'en'
+          ? 'Remove ' + (target.display_name || target.email) + ' from this organization?'
+          : '確定將 ' + (target.display_name || target.email) + ' 從本組織移除？',
+        { type: 'danger' }
+      );
+      if(!ok) return;
       e.currentTarget.disabled = true;
       try {
         const { error } = await supa.from('members').delete().eq('id', mid);
@@ -6402,7 +6527,7 @@
   // Settings — personal signature default template button
   const settingsPersonalSigBtn = $('settings-personal-signature-insert-default');
   if(settingsPersonalSigBtn){
-    settingsPersonalSigBtn.addEventListener('click', () => {
+    settingsPersonalSigBtn.addEventListener('click', async () => {
       const tpl = buildDefaultPersonalSignature();
       if(!tpl){
         toast(state.lang === 'en' ? 'Fill in name/title/mobile/Line ID first' : '請先填寫姓名／職稱／手機／Line ID', 'error');
@@ -6412,9 +6537,13 @@
       const current = (sigEl.value || '').trim();
       if(current){
         // Already has content — ask before overwriting
-        const ok = confirm(state.lang === 'en'
-          ? 'Overwrite existing signature with the auto-generated template from your latest profile info?'
-          : '要用最新的個人資料覆蓋目前的簽名嗎？\n（按取消保留現有內容）');
+        const ok = await confirmDialog(
+          state.lang === 'en' ? 'Overwrite Signature?' : '覆蓋現有簽名？',
+          state.lang === 'en'
+            ? 'This will replace your current signature with the auto-generated template.'
+            : '會用最新的個人資料覆蓋目前的簽名',
+          { type: 'warn' }
+        );
         if(!ok) return;
       }
       sigEl.value = tpl;
@@ -6517,9 +6646,8 @@
 
   // Save button — single source of truth, no cloning
   $('btn-save').addEventListener('click', async () => {
-    console.log('[Save Quote] button clicked');
     const btn = $('btn-save');
-    if(btn.disabled){ console.log('[Save Quote] button disabled, abort'); return; }
+    if(btn.disabled) return;
     btn.disabled = true;
     try {
       // If quote number is empty (new quote, never saved), compute it now
@@ -6539,7 +6667,6 @@
         qnEl.value = realNo;
         window._pendingDailySeq = seq;
       }
-      console.log('[Save Quote] quoteNo:', qnEl.value);
 
       const s = snapshot();
       if(window._pendingDailySeq){
@@ -6567,10 +6694,13 @@
             shouldUpdateBook = false;
           } else {
             // Loaded from history but client was modified — ask
-            const msg = state.lang === 'en'
-              ? 'Client details were modified. Update the address book with these new values?\n\nClick OK to update, Cancel to keep the address book unchanged (this quote will still be saved with the new values).'
-              : '您修改了客戶資料。是否同時更新客戶簿為最新資訊？\n\n按「確定」更新客戶簿，按「取消」保留客戶簿原資料（本張報價單仍會以新資料儲存）。';
-            shouldUpdateBook = confirm(msg);
+            shouldUpdateBook = await confirmDialog(
+              state.lang === 'en' ? 'Update Address Book?' : '更新客戶簿？',
+              state.lang === 'en'
+                ? 'Client details were modified. Update the address book with the new values? (This quote will still be saved with the new values either way.)'
+                : '您修改了客戶資料。是否同時更新客戶簿為最新資訊？\n（本張報價單仍會以新資料儲存）',
+              { type: 'info' }
+            );
           }
         }
         if(shouldUpdateBook){
@@ -6611,9 +6741,7 @@
       const msg = state.lang === 'en'
         ? (isUpdate ? 'Quote updated successfully.' : 'Saved as ' + qnEl.value)
         : (isUpdate ? '報價單已更新' : '報價單編號：' + qnEl.value);
-      console.log('[Save Quote] calling popup, title=', title);
       popup(title, msg, 'success');
-      console.log('[Save Quote] popup returned');
     } catch(err){
       console.error('[Save Quote] error:', err);
       popup(
@@ -6714,7 +6842,12 @@
       const fresh = b.cloneNode(true);
       b.replaceWith(fresh);
       fresh.addEventListener('click', async e => {
-        if(!confirm(t('confirm_delete'))) return;
+        const ok = await confirmDialog(
+          state.lang === 'en' ? 'Delete Client?' : '確定刪除？',
+          state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
+          { type: 'danger' }
+        );
+        if(!ok) return;
         const id = e.currentTarget.dataset.delC;
         saveClients(loadClients().filter(x => x.id !== id));
         await deleteClientFromCloud(id);
@@ -6729,7 +6862,12 @@
       const fresh = b.cloneNode(true);
       b.replaceWith(fresh);
       fresh.addEventListener('click', async e => {
-        if(!confirm(t('confirm_delete'))) return;
+        const ok = await confirmDialog(
+          state.lang === 'en' ? 'Delete Item?' : '確定刪除？',
+          state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。',
+          { type: 'danger' }
+        );
+        if(!ok) return;
         const id = e.currentTarget.dataset.delP;
         saveProducts(loadProducts().filter(x => x.id !== id));
         await deleteProductFromCloud(id);
@@ -6746,8 +6884,19 @@
       const fresh = b.cloneNode(true);
       b.replaceWith(fresh);
       fresh.addEventListener('click', async e => {
-        if(!confirm(t('confirm_delete'))) return;
         const id = e.currentTarget.dataset.del;
+        const q = loadQuotes().find(x => x.id === id);
+        const myId = currentUser && currentUser.id;
+        const isAdmin = currentMember && currentMember.role === 'admin';
+        const isMine = !q || !q.createdBy || q.createdBy === myId;
+        const confirmTitle = state.lang === 'en' ? 'Delete Quote?' : '確定刪除？';
+        const confirmMsg = (!isMine && isAdmin)
+          ? (state.lang === 'en' 
+              ? 'You are deleting another member\'s quote as admin. This cannot be undone.' 
+              : '您將以管理員身分刪除其他成員的報價單，刪除後無法復原。')
+          : (state.lang === 'en' ? 'This action cannot be undone.' : '刪除後無法復原。');
+        const ok = await confirmDialog(confirmTitle, confirmMsg, { type: 'danger' });
+        if(!ok) return;
         saveQuotes(loadQuotes().filter(x => x.id !== id));
         await deleteQuoteFromCloud(id);
         renderHistory();
